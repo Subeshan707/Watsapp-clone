@@ -142,7 +142,6 @@ export function playDialingTone(): RingtoneHandle {
   let stopped = false
   let timeoutId: ReturnType<typeof setTimeout> | null = null
   let currentOsc: OscillatorNode | null = null
-  let currentGain: GainNode | null = null
 
   function playTone() {
     if (stopped) return
@@ -164,7 +163,6 @@ export function playDialingTone(): RingtoneHandle {
       osc.stop(now + 2.0)
 
       currentOsc = osc
-      currentGain = gain
 
       // 2s tone, 4s gap = 6s cycle (standard ring-back)
       timeoutId = setTimeout(playTone, 4000)
@@ -181,7 +179,6 @@ export function playDialingTone(): RingtoneHandle {
       if (timeoutId != null) clearTimeout(timeoutId)
       try { currentOsc?.stop() } catch { /* already stopped */ }
       currentOsc = null
-      currentGain = null
     },
   }
 }
