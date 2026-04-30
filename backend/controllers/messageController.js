@@ -28,8 +28,8 @@ const createAndEmitMessage = async (io, senderId, receiverId, content) => {
   await message.save();
 
   const populatedMessage = await Message.findById(message._id)
-    .populate('sender', '_id username')
-    .populate('receiver', '_id username');
+    .populate('sender', '_id username phoneNumber countryCode about')
+    .populate('receiver', '_id username phoneNumber countryCode about');
 
   // Emit to both users' rooms
   io.to(`user:${senderId}`).emit('receiveMessage', populatedMessage);
@@ -45,13 +45,18 @@ const getMessages = async (req, res) => {
 
   try {
     const messages = await Message.find({
-      $or: [
-        { sender: currentUserId, receiver: otherUserId },
-        { sender: otherUserId, receiver: currentUserId }
+      $and: [
+        {
+          $or: [
+            { sender: currentUserId, receiver: otherUserId },
+            { sender: otherUserId, receiver: currentUserId }
+          ]
+        },
+        { deletedFor: { $nin: [currentUserId] } },
       ]
     })
-      .populate('sender', '_id username')
-      .populate('receiver', '_id username')
+      .populate('sender', '_id username phoneNumber countryCode about')
+      .populate('receiver', '_id username phoneNumber countryCode about')
       .sort({ timestamp: 1 });
 
     res.json(messages);

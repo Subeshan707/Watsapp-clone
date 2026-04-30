@@ -32,6 +32,36 @@ async function requestJson<T>(
   return data as T
 }
 
+// WhatsApp-style phone auth
+export async function sendOtp(phoneNumber: string, countryCode: string): Promise<{ success: boolean; otp?: string }> {
+  return requestJson('/api/users/send-otp', {
+    method: 'POST',
+    body: JSON.stringify({ phoneNumber, countryCode }),
+  })
+}
+
+export async function verifyOtp(phoneNumber: string, countryCode: string, otp: string): Promise<{
+  _id?: string
+  username?: string
+  phoneNumber: string
+  countryCode: string
+  about?: string
+  isNewUser: boolean
+}> {
+  return requestJson('/api/users/verify-otp', {
+    method: 'POST',
+    body: JSON.stringify({ phoneNumber, countryCode, otp }),
+  })
+}
+
+export async function setupProfile(phoneNumber: string, countryCode: string, username: string, about?: string): Promise<User> {
+  return requestJson<User>('/api/users/setup-profile', {
+    method: 'POST',
+    body: JSON.stringify({ phoneNumber, countryCode, username, about }),
+  })
+}
+
+// Legacy
 export async function authenticateUser(username: string): Promise<User> {
   return requestJson<User>('/api/users/authenticate', {
     method: 'POST',
@@ -65,5 +95,12 @@ export async function sendMessage(
     method: 'POST',
     userId: currentUserId,
     body: JSON.stringify({ receiverId, content }),
+  })
+}
+
+export async function getAiBot(currentUserId: string): Promise<User> {
+  return requestJson<User>('/api/ai/bot', {
+    method: 'GET',
+    userId: currentUserId,
   })
 }

@@ -1,15 +1,28 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import type { User, Message } from '../types'
+import aiBotAvatar from '../assets/ai-bot.png'
 
 type Props = {
   currentUser: User
   selectedUser: User | null
+  aiBotUserId: string | null
   messages: Message[]
   messagesLoading: boolean
   onSendMessage: (content: string) => Promise<void>
+  onDeleteMessage: (messageId: string, scope: 'everyone' | 'me') => void
+  onEditMessage?: (messageId: string, content: string) => void
   onStartCall: (type: 'audio' | 'video') => void
   onBack?: () => void
 }
+
+type ContextMenuState = {
+  messageId: string
+  text: string
+  canDelete: boolean
+  deleteScope: 'everyone' | 'me'
+  x: number
+  y: number
+} | null
 
 function formatTime(iso: string): string {
   try {
@@ -64,9 +77,42 @@ function groupMessagesByDate(messages: Message[]): { date: string; messages: Mes
   return groups
 }
 
-export default function ChatWindow({ currentUser, selectedUser, messages, messagesLoading, onSendMessage, onStartCall, onBack }: Props) {
+function renderBoldEmphasis(text: string) {
+  const out: ReactNode[] = []
+  let idx = 0
+  let key = 0
+
+  while (idx < text.length) {
+    const start = text.indexOf('**', idx)
+    if (start === -1) {
+      out.push(text.slice(idx))
+      break
+    }
+
+    const end = text.indexOf('**', start + 2)
+    if (end === -1) {
+      out.push(text.slice(idx))
+      break
+    }
+
+    if (start > idx) out.push(text.slice(idx, start))
+    const boldText = text.slice(start + 2, end)
+    out.push(
+      <strong key={`b_${key++}`} className="font-semibold">
+        {boldText}
+      </strong>,
+    )
+    idx = end + 2
+  }
+
+  return out
+}
+
+export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, messages, messagesLoading, onSendMessage, onDeleteMessage, onEditMessage, onStartCall, onBack }: Props) {
   const [draft, setDraft] = useState('')
   const [sending] = useState(false)
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -78,10 +124,92 @@ export default function ChatWindow({ currentUser, selectedUser, messages, messag
     if (selectedUser) inputRef.current?.focus()
   }, [selectedUser?._id])
 
+  useEffect(() => {
+    setContextMenu(null)
+  }, [selectedUser?._id])
+
+  useEffect(() => {
+    if (!contextMenu) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContextMenu(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [contextMenu])
+
+  function openContextMenu(e: ReactMouseEvent, message: Message, deleteScope: 'everyone' | 'me') {
+    e.preventDefault()
+
+    const menuWidth = 160
+    const canDelete = !message._id.startsWith('temp_')
+    const menuHeight = canDelete ? 88 : 44
+    const padding = 8
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - padding)
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - padding)
+    setContextMenu({ messageId: message._id, text: message.content, canDelete, deleteScope, x, y })
+  }
+
+  function handleMessagesContextMenuCapture(e: ReactMouseEvent<HTMLDivElement>) {
+    e.preventDefault()
+
+    const target = e.target as Element | null
+    if (!target) return
+
+    const msgEl = target.closest('[data-message-id]') as HTMLElement | null
+    if (!msgEl) return
+
+    const messageId = msgEl.getAttribute('data-message-id')
+    if (!messageId) return
+
+    const message = messages.find((m) => m._id === messageId)
+    if (!message) return
+
+    const isMine = message.sender._id === currentUser._id
+    const deleteScope: 'everyone' | 'me' = isMine ? 'everyone' : 'me'
+    openContextMenu(e, message, deleteScope)
+  }
+
+  async function copyToClipboard(text: string) {
+    const value = String(text)
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value)
+        return
+      }
+    } catch {
+      // fall through
+    }
+
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = value
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.focus()
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    } catch {
+      // ignore
+    }
+  }
+
   function handleSend(e: FormEvent) {
     e.preventDefault()
     const content = draft.trim()
     if (!content || !selectedUser) return
+    // If editing, call edit handler instead
+    if (editingMessageId) {
+      setDraft('')
+      const id = editingMessageId
+      setEditingMessageId(null)
+      if (typeof onEditMessage === 'function') onEditMessage(id, content)
+      inputRef.current?.focus()
+      return
+    }
+
     setDraft('')
     onSendMessage(content)
     inputRef.current?.focus()
@@ -114,6 +242,7 @@ export default function ChatWindow({ currentUser, selectedUser, messages, messag
   }
 
   const dateGroups = groupMessagesByDate(messages)
+  const isAiChat = Boolean(aiBotUserId && selectedUser._id === aiBotUserId)
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#0b141a]">
@@ -131,8 +260,12 @@ export default function ChatWindow({ currentUser, selectedUser, messages, messag
             </svg>
           </button>
         )}
-        <div className={`w-10 h-10 rounded-full ${getAvatarColor(selectedUser._id)} flex items-center justify-center text-white font-semibold text-sm shrink-0`}>
-          {getInitial(selectedUser.username)}
+        <div className={`w-10 h-10 rounded-full ${isAiChat ? 'bg-[#2a3942]' : getAvatarColor(selectedUser._id)} flex items-center justify-center text-white font-semibold text-sm shrink-0 overflow-hidden`}>
+          {isAiChat ? (
+            <img src={aiBotAvatar} alt="AI" className="w-full h-full object-cover" />
+          ) : (
+            getInitial(selectedUser.username)
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[#e9edef] text-base font-normal truncate">{selectedUser.username}</div>
@@ -167,6 +300,7 @@ export default function ChatWindow({ currentUser, selectedUser, messages, messag
       {/* Messages area with WhatsApp wallpaper pattern */}
       <div
         className="flex-1 overflow-y-auto px-3 md:px-[6%] py-3 relative"
+        onContextMenuCapture={handleMessagesContextMenuCapture}
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23111b21' fill-opacity='0.6'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           backgroundColor: '#0b141a',
@@ -205,9 +339,12 @@ export default function ChatWindow({ currentUser, selectedUser, messages, messag
               const isMine = m.sender._id === currentUser._id
               const isRead = Boolean(m.readAt)
               const isDelivered = Boolean(m.deliveredAt)
+              const deleteScope: 'everyone' | 'me' = isMine ? 'everyone' : 'me'
               return (
                 <div key={m._id} className={`flex mb-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
                   <div
+                    data-message-id={m._id}
+                    onContextMenu={(e) => openContextMenu(e, m, deleteScope)}
                     className={`max-w-[85%] md:max-w-[65%] rounded-lg px-2.5 py-1.5 shadow-md relative ${
                       isMine
                         ? 'bg-[#005c4b] text-[#e9edef]'
@@ -220,7 +357,7 @@ export default function ChatWindow({ currentUser, selectedUser, messages, messag
                   >
                     <div className="grid grid-cols-[1fr_auto] items-end gap-x-2">
                       <div className="text-sm leading-relaxed whitespace-pre-wrap break-words min-w-0">
-                        {m.content}
+                        {renderBoldEmphasis(m.content)}
                       </div>
                       <div
                         className={`flex items-center gap-1 whitespace-nowrap ${
@@ -229,6 +366,7 @@ export default function ChatWindow({ currentUser, selectedUser, messages, messag
                       >
                         <span className="text-[11px] leading-none">{formatTime(m.timestamp)}</span>
                         {isMine && (
+                            <div className="flex items-center">
                           <svg
                             viewBox="0 0 16 11"
                             width="16"
@@ -241,6 +379,7 @@ export default function ChatWindow({ currentUser, selectedUser, messages, messag
                               <path d="M14.757.653a.457.457 0 00-.305-.102.493.493 0 00-.38.178l-6.19 7.636-0.613-.637.693.699 0-.001-0.072.089a.467.467 0 00.34-.178l6.514-8.03a.45.45 0 00.013-.654z"/>
                             )}
                           </svg>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -252,6 +391,66 @@ export default function ChatWindow({ currentUser, selectedUser, messages, messag
         ))}
         <div ref={endRef} />
       </div>
+
+      {contextMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setContextMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setContextMenu(null)
+            }}
+          />
+          <div
+            className="fixed z-50 bg-[#202c33] border border-[#2a3942] rounded-lg overflow-hidden shadow-lg"
+            style={{ top: contextMenu.y, left: contextMenu.x, width: '160px' }}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                copyToClipboard(contextMenu.text)
+                setContextMenu(null)
+              }}
+              className="w-full text-left px-4 py-2 text-sm text-[#e9edef] hover:bg-[#2a3942] transition-colors"
+            >
+              Copy
+            </button>
+
+            {/* Edit (only for user's own messages) */}
+            {contextMenu.canDelete && (
+              <button
+                type="button"
+                onClick={() => {
+                  // Start editing: populate input with message text
+                  setDraft(contextMenu.text)
+                  setEditingMessageId(contextMenu.messageId)
+                  setContextMenu(null)
+                  // focus input next tick
+                  setTimeout(() => inputRef.current?.focus(), 0)
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-[#e9edef] hover:bg-[#2a3942] transition-colors"
+              >
+                Edit
+              </button>
+            )}
+
+            {contextMenu.canDelete && (
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteMessage(contextMenu.messageId, contextMenu.deleteScope)
+                  setContextMenu(null)
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-[#e9edef] hover:bg-[#2a3942] transition-colors"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Message input */}
       <div className="bg-[#202c33] px-4 py-2.5 shrink-0">

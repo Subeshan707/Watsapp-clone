@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import type { User, Message } from '../types'
+import aiBotAvatar from '../assets/ai-bot.png'
 
 type Props = {
   currentUser: User
   users: User[]
+  aiBotUserId: string | null
   selectedUserId: string | null
   messagesByUserId: Record<string, Message[]>
   unreadByUserId: Record<string, number>
@@ -52,14 +54,17 @@ function getAvatarColor(id: string): string {
 }
 
 export default function Sidebar({
-  currentUser, users, selectedUserId, messagesByUserId,
+  currentUser, users, aiBotUserId, selectedUserId, messagesByUserId,
   unreadByUserId,
   loading, onSelectUser, onRefresh, onLogout,
 }: Props) {
   const [search, setSearch] = useState('')
 
   const filtered = search.trim()
-    ? users.filter((u) => u.username.toLowerCase().includes(search.toLowerCase()))
+    ? users.filter((u) =>
+        u.username.toLowerCase().includes(search.toLowerCase()) ||
+        (u.phoneNumber && u.phoneNumber.includes(search))
+      )
     : users
 
   return (
@@ -70,7 +75,12 @@ export default function Sidebar({
           <div className={`w-10 h-10 rounded-full ${getAvatarColor(currentUser._id)} flex items-center justify-center text-white font-semibold text-sm`}>
             {getInitial(currentUser.username)}
           </div>
-          <span className="text-[#e9edef] text-sm font-medium">{currentUser.username}</span>
+          <div className="flex flex-col">
+            <span className="text-[#e9edef] text-sm font-medium">{currentUser.username}</span>
+            {currentUser.phoneNumber && (
+              <span className="text-[10px] text-[#8696a0]">{currentUser.countryCode || ''} {currentUser.phoneNumber}</span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -126,6 +136,7 @@ export default function Sidebar({
             const lastMsg = getLastMessage(messagesByUserId[user._id])
             const isSelected = user._id === selectedUserId
             const unreadCount = unreadByUserId[user._id] ?? 0
+            const isAiBot = Boolean(aiBotUserId && user._id === aiBotUserId)
             return (
               <button
                 key={user._id}
@@ -136,8 +147,12 @@ export default function Sidebar({
                   isSelected ? 'bg-[#2a3942]' : ''
                 }`}
               >
-                <div className={`w-12 h-12 rounded-full ${getAvatarColor(user._id)} flex items-center justify-center text-white font-semibold text-lg shrink-0`}>
-                  {getInitial(user.username)}
+                <div className={`w-12 h-12 rounded-full ${isAiBot ? 'bg-[#2a3942]' : getAvatarColor(user._id)} flex items-center justify-center text-white font-semibold text-lg shrink-0 overflow-hidden`}>
+                  {isAiBot ? (
+                    <img src={aiBotAvatar} alt="AI" className="w-full h-full object-cover" />
+                  ) : (
+                    getInitial(user.username)
+                  )}
                 </div>
                 <div className="flex-1 min-w-0 text-left">
                   <div className="flex items-center justify-between">
@@ -160,7 +175,11 @@ export default function Sidebar({
                     )}
                   </div>
                   <p className="text-sm text-[#8696a0] truncate mt-0.5">
-                    {lastMsg ? lastMsg.content : 'Start a conversation'}
+                    {lastMsg
+                      ? lastMsg.content
+                      : user.phoneNumber
+                        ? `${user.countryCode || ''} ${user.phoneNumber}`
+                        : 'Start a conversation'}
                   </p>
                 </div>
               </button>

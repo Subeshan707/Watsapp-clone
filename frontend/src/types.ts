@@ -1,6 +1,9 @@
 export type User = {
   _id: string
   username: string
+  phoneNumber?: string
+  countryCode?: string
+  about?: string
 }
 
 export type Message = {
@@ -11,4 +14,5 @@ export type Message = {
   timestamp: string
   deliveredAt?: string | null
   readAt?: string | null
+  editedAt?: string | null
 }

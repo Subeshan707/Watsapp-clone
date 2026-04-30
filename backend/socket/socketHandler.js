@@ -1,6 +1,8 @@
 const User = require('../models/User');
 const Message = require('../models/Message');
 const { createAndEmitMessage } = require('../controllers/messageController');
+const { getAiBotUsername } = require('../utils/aiBot');
+const { generateAiReplyForConversation } = require('../utils/aiChat');
 
 async function markUndeliveredAsDelivered(io, receiverId) {
   const pending = await Message.find({ receiver: receiverId, deliveredAt: null }).select('_id');
@@ -14,8 +16,8 @@ async function markUndeliveredAsDelivered(io, receiverId) {
   );
 
   const updated = await Message.find({ _id: { $in: ids } })
-    .populate('sender', '_id username')
-    .populate('receiver', '_id username');
+    .populate('sender', '_id username phoneNumber countryCode about')
+    .populate('receiver', '_id username phoneNumber countryCode about');
 
   for (const msg of updated) {
     io.to(`user:${msg.sender._id}`).emit('messageUpdated', msg);
@@ -45,8 +47,8 @@ async function markConversationAsRead(io, readerId, otherUserId) {
   );
 
   const updated = await Message.find({ _id: { $in: ids } })
-    .populate('sender', '_id username')
-    .populate('receiver', '_id username');
+    .populate('sender', '_id username phoneNumber countryCode about')
+    .populate('receiver', '_id username phoneNumber countryCode about');
 
   for (const msg of updated) {
     io.to(`user:${msg.sender._id}`).emit('messageUpdated', msg);
@@ -119,8 +121,133 @@ module.exports = (io) => {
       try {
         const message = await createAndEmitMessage(io, userId, receiverId, content);
         if (callback) callback({ success: true, message });
+
+        // If the receiver is the AI bot, generate a reply asynchronously.
+        if (message?.receiver?.username && message.receiver.username === getAiBotUsername()) {
+          const botId = String(message.receiver._id);
+          if (botId !== String(userId)) {
+            generateAiReplyForConversation(String(userId), botId)
+              .then((reply) => {
+                if (!reply || typeof reply !== 'string' || reply.trim() === '') return;
+                return createAndEmitMessage(io, botId, String(userId), reply);
+              })
+              .catch(() => {
+                // best-effort
+              });
+          }
+        }
       } catch (err) {
         if (callback) callback({ error: err.message });
+      }
+    });
+
+    socket.on('deleteMessage', async (data, callback) => {
+      const { messageId } = data || {};
+      if (!messageId || typeof messageId !== 'string') {
+        if (callback) callback({ error: 'messageId is required' });
+        return;
+      }
+
+      try {
+        const message = await Message.findById(messageId).select('sender receiver');
+        if (!message) {
+          if (callback) callback({ error: 'Message not found' });
+          return;
+        }
+
+        if (String(message.sender) !== String(userId)) {
+          if (callback) callback({ error: 'You can only delete your own messages' });
+          return;
+        }
+
+        const senderId = String(message.sender);
+        const receiverId = String(message.receiver);
+
+        await Message.deleteOne({ _id: messageId });
+
+        io.to(`user:${senderId}`).emit('messageDeleted', { messageId, senderId, receiverId });
+        io.to(`user:${receiverId}`).emit('messageDeleted', { messageId, senderId, receiverId });
+
+        if (callback) callback({ success: true });
+      } catch (err) {
+        if (callback) callback({ error: err?.message || 'Failed to delete message' });
+      }
+    });
+
+    socket.on('deleteMessageForMe', async (data, callback) => {
+      const { messageId } = data || {};
+      if (!messageId || typeof messageId !== 'string') {
+        if (callback) callback({ error: 'messageId is required' });
+        return;
+      }
+
+      try {
+        const message = await Message.findById(messageId).select('sender receiver');
+        if (!message) {
+          if (callback) callback({ error: 'Message not found' });
+          return;
+        }
+
+        const senderId = String(message.sender);
+        const receiverId = String(message.receiver);
+        if (String(userId) !== senderId && String(userId) !== receiverId) {
+          if (callback) callback({ error: 'Not allowed' });
+          return;
+        }
+
+        await Message.updateOne(
+          { _id: messageId },
+          { $addToSet: { deletedFor: userId } },
+        );
+
+        io.to(`user:${userId}`).emit('messageDeleted', { messageId, senderId, receiverId });
+        if (callback) callback({ success: true });
+      } catch (err) {
+        if (callback) callback({ error: err?.message || 'Failed to delete message' });
+      }
+    });
+
+    // Edit message content (sender only)
+    socket.on('editMessage', async (data, callback) => {
+      const { messageId, content } = data || {};
+      if (!messageId || typeof messageId !== 'string') {
+        if (callback) callback({ error: 'messageId is required' });
+        return;
+      }
+      if (!content || typeof content !== 'string' || content.trim() === '') {
+        if (callback) callback({ error: 'content is required' });
+        return;
+      }
+
+      try {
+        const message = await Message.findById(messageId).select('sender receiver');
+        if (!message) {
+          if (callback) callback({ error: 'Message not found' });
+          return;
+        }
+
+        if (String(message.sender) !== String(userId)) {
+          if (callback) callback({ error: 'You can only edit your own messages' });
+          return;
+        }
+
+        await Message.updateOne(
+          { _id: messageId },
+          { $set: { content: content.trim(), editedAt: new Date() } },
+        );
+
+        const updated = await Message.findById(messageId)
+          .populate('sender', '_id username phoneNumber countryCode about')
+          .populate('receiver', '_id username phoneNumber countryCode about');
+
+        if (updated) {
+          io.to(`user:${String(updated.sender._id)}`).emit('messageUpdated', updated);
+          io.to(`user:${String(updated.receiver._id)}`).emit('messageUpdated', updated);
+        }
+
+        if (callback) callback({ success: true, message: updated });
+      } catch (err) {
+        if (callback) callback({ error: err?.message || 'Failed to edit message' });
       }
     });
 

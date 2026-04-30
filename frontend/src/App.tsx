@@ -4,7 +4,7 @@ import LoginScreen from './components/LoginScreen'
 import Sidebar from './components/Sidebar'
 import ChatWindow from './components/ChatWindow'
 import CallOverlay, { type CallViewState } from './components/CallOverlay'
-import { authenticateUser, getMessages, getUsers } from './lib/api'
+import { setupProfile, getAiBot, getMessages, getUsers } from './lib/api'
 import { createSocket } from './lib/socket'
 import { playNotificationSound, playSentSound, playCallEndSound } from './lib/sounds'
 import { ICE_SERVERS } from './config'
@@ -20,6 +20,7 @@ function isUser(value: unknown): value is User {
   if (!value || typeof value !== 'object') return false
   const maybe = value as Json
   return typeof maybe._id === 'string' && typeof maybe.username === 'string'
+  // phoneNumber is optional for backward compatibility
 }
 
 function loadStoredUser(): User | null {
@@ -43,9 +44,18 @@ function mergeMessages(existing: Message[], incoming: Message[]): Message[] {
   )
 }
 
+function pinUserToTop(list: User[], pinnedId: string | null): User[] {
+  if (!pinnedId) return list
+  const idx = list.findIndex((u) => u._id === pinnedId)
+  if (idx <= 0) return list
+  const pinned = list[idx]
+  return [pinned, ...list.slice(0, idx), ...list.slice(idx + 1)]
+}
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => loadStoredUser())
   const [users, setUsers] = useState<User[]>([])
+  const [aiBotUserId, setAiBotUserId] = useState<string | null>(null)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [messagesByUserId, setMessagesByUserId] = useState<Record<string, Message[]>>({})
   const [unreadByUserId, setUnreadByUserId] = useState<Record<string, number>>({})
@@ -59,6 +69,7 @@ export default function App() {
   const socketRef = useRef<Socket | null>(null)
   const currentUserRef = useRef<User | null>(currentUser)
   const selectedUserIdRef = useRef<string | null>(selectedUserId)
+  const aiBotIdRef = useRef<string | null>(null)
   const callRef = useRef<CallViewState | null>(call)
   const peerRef = useRef<RTCPeerConnection | null>(null)
   const peerCallIdRef = useRef<string | null>(null)
@@ -83,8 +94,17 @@ export default function App() {
 
   const upsertUser = useCallback((user: User) => {
     setUsers((prev) => {
+      const pinnedId = aiBotIdRef.current
       const exists = prev.some((u) => u._id === user._id)
-      return exists ? prev : [user, ...prev]
+      if (exists) return pinUserToTop(prev, pinnedId)
+
+      if (!pinnedId) return [user, ...prev]
+      if (user._id === pinnedId) return [user, ...prev]
+
+      const pinned = prev.find((u) => u._id === pinnedId)
+      if (!pinned) return [user, ...prev]
+      const rest = prev.filter((u) => u._id !== pinnedId)
+      return [pinned, user, ...rest]
     })
   }, [])
 
@@ -427,11 +447,22 @@ export default function App() {
   async function refreshUsers(userId: string) {
     setUsersLoading(true)
     try {
+      let bot: User | null = null
+      try {
+        bot = await getAiBot(userId)
+        aiBotIdRef.current = bot._id
+        setAiBotUserId(bot._id)
+      } catch {
+        // ignore
+        setAiBotUserId(null)
+      }
+
       const data = await getUsers(userId)
-      setUsers(data)
+      const merged = bot ? [bot, ...data.filter((u) => u._id !== bot._id)] : data
+      setUsers(merged)
       setSelectedUserId((cur) => {
         if (!cur) return cur
-        return data.some((u) => u._id === cur) ? cur : null
+        return merged.some((u) => u._id === cur) ? cur : null
       })
     } catch {
       // silently handle
@@ -468,8 +499,8 @@ export default function App() {
     }
   }
 
-  async function handleLogin(username: string) {
-    const user = await authenticateUser(username)
+  async function handleLogin(phoneNumber: string, countryCode: string, username: string) {
+    const user = await setupProfile(phoneNumber, countryCode, username)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
     setCurrentUser(user)
     setSelectedUserId(null)
@@ -485,6 +516,8 @@ export default function App() {
 
   function handleLogout() {
     hangupCall()
+    aiBotIdRef.current = null
+    setAiBotUserId(null)
     localStorage.removeItem(STORAGE_KEY)
     setCurrentUser(null)
     setUsers([])
@@ -534,6 +567,34 @@ export default function App() {
     })
   }
 
+  function handleDeleteMessage(messageId: string, scope: 'everyone' | 'me') {
+    if (!currentUser) return
+    const socket = socketRef.current
+    if (!socket?.connected) return
+
+    if (scope === 'me') {
+      socket.emit('deleteMessageForMe', { messageId }, (_resp: { success?: boolean; error?: string }) => {
+        // UI updates via the messageDeleted broadcast (to this user)
+      })
+      return
+    }
+
+    socket.emit('deleteMessage', { messageId }, (_resp: { success?: boolean; error?: string }) => {
+      // UI updates via the messageDeleted broadcast (including for the sender)
+    })
+  }
+
+  // Edit message (sender only)
+  function handleEditMessage(messageId: string, newContent: string) {
+    const socket = socketRef.current
+    if (!socket?.connected) return
+    if (!messageId || !newContent || newContent.trim() === '') return
+
+    socket.emit('editMessage', { messageId, content: newContent }, (_resp: { success?: boolean; message?: Message; error?: string }) => {
+      // server will emit 'messageUpdated' to reconcile; we don't need to update optimistically here
+    })
+  }
+
   // Fetch users on login
   useEffect(() => {
     if (!currentUser) return
@@ -568,6 +629,41 @@ export default function App() {
 
     const onMessageUpdated = (message: Message) => {
       mergeMessageUpdate(message)
+    }
+
+    const onMessageDeleted = (payload: { messageId: string; senderId: string; receiverId: string }) => {
+      const user = currentUserRef.current
+      if (!user) return
+
+      const messageId = payload?.messageId
+      const senderId = payload?.senderId
+      const receiverId = payload?.receiverId
+      if (!messageId || !senderId || !receiverId) return
+
+      const otherUserId = senderId === user._id ? receiverId : senderId
+
+      setMessagesByUserId((prev) => {
+        const existing = prev[otherUserId] ?? []
+        if (existing.length === 0) return prev
+
+        const toDelete = existing.find((m) => m._id === messageId) || null
+        const next = existing.filter((m) => m._id !== messageId)
+        if (next.length === existing.length) return prev
+
+        // If an unread incoming message gets deleted, decrement unread count.
+        if (toDelete && toDelete.sender._id !== user._id && !toDelete.readAt) {
+          const selectedId = selectedUserIdRef.current
+          if (otherUserId !== selectedId) {
+            setUnreadByUserId((uPrev) => {
+              const cur = uPrev[otherUserId] ?? 0
+              if (cur <= 0) return uPrev
+              return { ...uPrev, [otherUserId]: cur - 1 }
+            })
+          }
+        }
+
+        return { ...prev, [otherUserId]: next }
+      })
     }
 
     const onIncomingCall = (payload: { callId: string; from: User; type: CallType }) => {
@@ -681,6 +777,7 @@ export default function App() {
 
     socket.on('receiveMessage', onReceiveMessage)
     socket.on('messageUpdated', onMessageUpdated)
+    socket.on('messageDeleted', onMessageDeleted)
     socket.on('incomingCall', onIncomingCall)
     socket.on('callAccepted', onCallAccepted)
     socket.on('callRejected', onCallRejected)
@@ -693,6 +790,7 @@ export default function App() {
     return () => {
       socket.off('receiveMessage', onReceiveMessage)
       socket.off('messageUpdated', onMessageUpdated)
+      socket.off('messageDeleted', onMessageDeleted)
       socket.off('incomingCall', onIncomingCall)
       socket.off('callAccepted', onCallAccepted)
       socket.off('callRejected', onCallRejected)
@@ -719,6 +817,7 @@ export default function App() {
         <Sidebar
           currentUser={currentUser}
           users={users}
+          aiBotUserId={aiBotUserId}
           selectedUserId={selectedUserId}
           messagesByUserId={messagesByUserId}
           unreadByUserId={unreadByUserId}
@@ -734,9 +833,12 @@ export default function App() {
         <ChatWindow
           currentUser={currentUser}
           selectedUser={selectedUser}
+          aiBotUserId={aiBotUserId}
           messages={conversationMessages}
           messagesLoading={messagesLoading}
           onSendMessage={handleSendMessage}
+          onEditMessage={handleEditMessage}
+          onDeleteMessage={handleDeleteMessage}
           onStartCall={startCall}
           onBack={() => setSelectedUserId(null)}
         />

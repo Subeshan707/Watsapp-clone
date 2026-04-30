@@ -11,6 +11,11 @@ const MessageSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  // Per-user deletion ("Delete for me")
+  deletedFor: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
   content: {
     type: String,
     required: true,
