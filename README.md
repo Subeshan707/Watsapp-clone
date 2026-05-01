@@ -1,88 +1,70 @@
-# WhatsApp Web Clone
+# Orbit
 
-A full-stack real-time chat application inspired by WhatsApp Web, built with React, Node.js, Socket.IO, and MongoDB.
+A full-stack, real-time chat application inspired by modern messaging platforms. Built with React, Node.js, Socket.IO, and MongoDB.
 
-![WhatsApp Clone](https://img.shields.io/badge/Status-Complete-00a884?style=for-the-badge)
+**[🌐 View Live Deployment (Orbit)](https://watsapp-clone-omega.vercel.app/)**
+
+![Orbit](https://img.shields.io/badge/Status-Live-00a884?style=for-the-badge)
 ![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black)
 ![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Socket.IO](https://img.shields.io/badge/Socket.IO-010101?style=for-the-badge&logo=socketdotio&logoColor=white)
+![WebRTC](https://img.shields.io/badge/WebRTC-333333?style=for-the-badge&logo=webrtc&logoColor=white)
 
 ---
 
-## Features
+## 🚀 Features
 
-- **User Authentication** — Simple username-based login with auto-registration
-- **Real-Time Messaging** — Instant message delivery via Socket.IO WebSockets
-- **Two-Panel Layout** — WhatsApp Web-inspired UI with sidebar chat list and chat window
-- **Message Persistence** — All messages stored in MongoDB and persist after page refresh
-- **Search** — Filter users in the sidebar
-- **Responsive Design** — Works on desktop screens
-- **Visual Message Distinction** — Sent (green) vs received (dark) message bubbles
-- **Read Receipts UI** — Blue double-check marks on sent messages
-- **Auto-scroll** — Chat automatically scrolls to the latest message
-- **Date Separators** — Messages grouped by date with labels (Today, Yesterday, etc.)
-- **User Avatars** — Colorful auto-generated avatar initials
+Orbit is a fully-featured communication platform supporting real-time chat, media sharing, and high-quality calls.
+
+- **OTP Authentication**: Phone number verification using Twilio SMS.
+- **Real-Time Messaging**: Instant text delivery powered by Socket.IO WebSockets.
+- **Audio & Video Calling**: Peer-to-peer secure calling using WebRTC with native ringing tones.
+- **Media Attachments**: Support for sending images, videos, audio, and documents (up to 25MB).
+- **Voice Messaging**: Built-in audio recorder to record and send voice notes.
+- **Emoji Picker**: Native dark-mode emoji picker integrated into the chat bar.
+- **AI ChatBot Integration**: Integrated intelligent AI assistant powered by Groq (LLaMA 3).
+- **Message Management**: Edit sent messages and delete messages ("Delete for me").
+- **Contact Management**: Add contacts by phone number and sync with the database.
+- **Read Receipts**: Real-time message status (Sent, Delivered, Read with blue ticks).
+- **User Profiles**: Custom "About" status and auto-generated colorful avatars.
+- **Context Menus**: Right-click context menus for quick actions on messages and contacts.
+- **Responsive Layout**: Fluid UI optimized for desktop and mobile web experiences.
 
 ---
 
-## Tech Stack
+## 🛠 Tech Stack
 
 | Layer    | Technology                          |
 | -------- | ----------------------------------- |
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS v4 |
 | Backend  | Node.js, Express.js                 |
 | Database | MongoDB (Atlas)                     |
-| Realtime | Socket.IO                           |
+| Realtime | Socket.IO, WebRTC                   |
+| AI Auth  | Twilio API, Groq LLaMA 3            |
 
 ---
 
-## Project Structure
+## 📂 Project Structure
 
 ```
-watsapp/
+orbit/
 ├── backend/
-│   ├── config/
-│   │   └── db.js              # MongoDB connection
-│   ├── controllers/
-│   │   ├── messageController.js   # Message CRUD + emit logic
-│   │   └── userController.js      # User auth/fetch logic
-│   ├── middleware/
-│   │   └── auth.js            # Simple x-user-id auth middleware
-│   ├── models/
-│   │   ├── Message.js         # Mongoose Message schema
-│   │   └── User.js            # Mongoose User schema
-│   ├── routes/
-│   │   ├── messageRoutes.js   # POST/GET message endpoints
-│   │   └── userRoutes.js      # POST authenticate, GET users
-│   ├── socket/
-│   │   └── socketHandler.js   # Socket.IO event handlers
-│   ├── utils/
-│   │   └── helpers.js         # Utility functions
-│   ├── .env                   # Environment variables
-│   ├── package.json
-│   └── server.js              # Express + Socket.IO entry point
+│   ├── config/              # MongoDB connection
+│   ├── controllers/         # Messaging, Users, AI, Contacts
+│   ├── models/              # Mongoose Schemas (User, Message, Contact)
+│   ├── routes/              # Express API Routes
+│   ├── socket/              # Socket.IO & WebRTC signaling events
+│   ├── server.js            # Express + Socket.IO entry point
+│   └── .env                 # Environment variables
 │
 ├── frontend/
-│   ├── public/
-│   │   └── favicon.svg
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── ChatWindow.tsx     # Chat area with messages
-│   │   │   ├── LoginScreen.tsx    # Login/register screen
-│   │   │   └── Sidebar.tsx        # User list sidebar
-│   │   ├── lib/
-│   │   │   ├── api.ts         # REST API functions
-│   │   │   └── socket.ts      # Socket.IO client setup
-│   │   ├── App.tsx            # Main application component
-│   │   ├── config.ts          # Environment config
-│   │   ├── index.css          # Global styles
-│   │   ├── main.tsx           # React entry point
-│   │   └── types.ts           # TypeScript types
-│   ├── .env                   # Frontend environment variables
-│   ├── index.html
-│   ├── package.json
-│   ├── tailwind.config.js
+│   │   ├── components/      # UI Components (ChatWindow, Sidebar, Login, etc.)
+│   │   ├── lib/             # API helpers, Sounds, Socket, WebRTC
+│   │   ├── App.tsx          # Main Application Core
+│   │   └── index.css        # Tailwind Global Styles
+│   ├── .env                 # Frontend environment variables
 │   └── vite.config.ts
 │
 └── README.md
@@ -90,21 +72,17 @@ watsapp/
 
 ---
 
-## Prerequisites
-
-- **Node.js** v18 or higher
-- **npm** v9 or higher
-- **MongoDB** — A MongoDB Atlas cluster (or local MongoDB instance)
-
----
-
-## Environment Variables
+## 🔑 Environment Variables
 
 ### Backend (`backend/.env`)
 
 ```env
 PORT=5000
-MONGO_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<dbname>?retryWrites=true&w=majority
+MONGO_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<dbname>
+TWILIO_ACCOUNT_SID=your_twilio_sid
+TWILIO_AUTH_TOKEN=your_twilio_token
+TWILIO_PHONE_NUMBER=your_twilio_phone
+GROQ_API_KEY=your_groq_api_key
 ```
 
 ### Frontend (`frontend/.env`)
@@ -114,26 +92,17 @@ VITE_API_BASE_URL=http://localhost:5000
 VITE_SOCKET_URL=http://localhost:5000
 ```
 
-### Production Deployment
-
-When you deploy the frontend to Vercel, set these environment variables in the Vercel project settings to the URL of your deployed backend:
-
-```env
-VITE_API_BASE_URL=https://your-backend-domain.com
-VITE_SOCKET_URL=https://your-backend-domain.com
-```
-
-If these are missing in production, the app will now fail fast with a configuration error instead of sending API requests to the Vercel site itself.
+*For production deployment on Vercel, replace `localhost:5000` with your deployed backend URL.*
 
 ---
 
-## Setup & Run Locally
+## 💻 Setup & Run Locally
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/<your-username>/watsapp.git
-cd watsapp
+git clone https://github.com/Subeshan707/Watsapp-clone.git
+cd Watsapp-clone
 ```
 
 ### 2. Setup Backend
@@ -141,18 +110,6 @@ cd watsapp
 ```bash
 cd backend
 npm install
-```
-
-Create a `.env` file (or edit the existing one) with your MongoDB URI:
-
-```env
-PORT=5000
-MONGO_URI=mongodb+srv://your_user:your_password@cluster0.xxxxx.mongodb.net/whatsapp_clone
-```
-
-Start the backend:
-
-```bash
 npm run dev
 ```
 
@@ -172,65 +129,21 @@ The frontend will start on `http://localhost:5173`.
 
 ### 4. Test the App
 
-1. Open `http://localhost:5173` in **Browser 1** → Sign in as `alice`
-2. Open `http://localhost:5173` in **Browser 2** (or incognito) → Sign in as `bob`
-3. Click on the other user in the sidebar to start chatting
-4. Messages appear in real-time on both browsers!
+1. Open `http://localhost:5173` and authenticate using a valid phone number.
+2. Open an incognito window and authenticate with a second phone number.
+3. Add the other user as a contact.
+4. Experience real-time chat, WebRTC calling, AI chatbot features, and file sharing!
 
 ---
 
-## API Endpoints
+## 📡 Socket.IO & WebRTC Architecture
 
-| Method | Endpoint                      | Description               | Auth Header    |
-| ------ | ----------------------------- | ------------------------- | -------------- |
-| POST   | `/api/users/authenticate`     | Login or register a user  | None           |
-| GET    | `/api/users`                  | Get all users (except self) | `x-user-id`  |
-| POST   | `/api/messages`               | Send a message            | `x-user-id`   |
-| GET    | `/api/messages/:otherUserId`  | Get message history       | `x-user-id`   |
-
-### Authentication
-
-This app uses a simple header-based auth system. After login, the user's `_id` is sent as the `x-user-id` header on every API request.
+- **Messaging**: Users join a private Socket room (`user:{userId}`). Messages and read receipts are emitted directly to these rooms.
+- **Calling**: WebRTC connection relies on Socket.IO for signaling. The app emits `webrtcOffer`, `webrtcAnswer`, and `webrtcIceCandidate` to establish the direct P2P media stream.
+- **Attachments**: Processed as Base64 DataURLs. The backend `maxHttpBufferSize` is heavily expanded (25MB) to comfortably stream media.
 
 ---
 
-## Socket.IO Events
+## 📝 License
 
-| Event            | Direction       | Description                    |
-| ---------------- | --------------- | ------------------------------ |
-| `connection`     | Client → Server | Joins user to their room       |
-| `sendMessage`    | Client → Server | Send a new message             |
-| `receiveMessage` | Server → Client | Receive a new message in real-time |
-| `disconnect`     | Client → Server | User disconnects               |
-
----
-
-## Database Schema
-
-### User
-
-```json
-{
-  "_id": "ObjectId",
-  "username": "string (unique, required)",
-  "createdAt": "Date"
-}
-```
-
-### Message
-
-```json
-{
-  "_id": "ObjectId",
-  "sender": "ObjectId (ref: User)",
-  "receiver": "ObjectId (ref: User)",
-  "content": "string (required)",
-  "timestamp": "Date"
-}
-```
-
----
-
-## License
-
-This project is for educational purposes.
+This project is for educational and portfolio purposes.
