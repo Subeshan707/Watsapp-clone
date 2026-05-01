@@ -114,6 +114,17 @@ VITE_API_BASE_URL=http://localhost:5000
 VITE_SOCKET_URL=http://localhost:5000
 ```
 
+### Production Deployment
+
+When you deploy the frontend to Vercel, set these environment variables in the Vercel project settings to the URL of your deployed backend:
+
+```env
+VITE_API_BASE_URL=https://your-backend-domain.com
+VITE_SOCKET_URL=https://your-backend-domain.com
+```
+
+If these are missing in production, the app will now fail fast with a configuration error instead of sending API requests to the Vercel site itself.
+
 ---
 
 ## Setup & Run Locally

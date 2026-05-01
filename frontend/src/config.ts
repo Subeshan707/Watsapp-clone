@@ -1,11 +1,19 @@
-export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(
-  /\/+$/,
-  '',
-)
+function normalizeUrl(value: string): string {
+  return value.replace(/\/+$/, '')
+}
 
-export const SOCKET_URL = (
-  import.meta.env.VITE_SOCKET_URL || API_BASE_URL || window.location.origin
-).replace(/\/+$/, '')
+function getRequiredProductionUrl(envValue: string | undefined): string {
+  const trimmed = envValue?.trim()
+  if (trimmed) return normalizeUrl(trimmed)
+  if (import.meta.env.DEV) return 'http://localhost:5000'
+  return ''
+}
+
+export const API_BASE_URL = getRequiredProductionUrl(import.meta.env.VITE_API_BASE_URL)
+
+export const SOCKET_URL = normalizeUrl(
+  import.meta.env.VITE_SOCKET_URL || API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:5000' : ''),
+)
 
 // Parse optional ICE servers from env (VITE_ICE_SERVERS), fallback to public STUN
 export const ICE_SERVERS: RTCIceServer[] = (() => {

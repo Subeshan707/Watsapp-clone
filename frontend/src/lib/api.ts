@@ -7,6 +7,12 @@ async function requestJson<T>(
   path: string,
   options: RequestInit & { userId?: string } = {},
 ): Promise<T> {
+  if (!API_BASE_URL) {
+    throw new Error(
+      'Frontend API base URL is not configured. Set VITE_API_BASE_URL to your deployed backend URL before deploying to production.',
+    )
+  }
+
   const url = `${API_BASE_URL}${path}`
 
   const headers = new Headers(options.headers)
