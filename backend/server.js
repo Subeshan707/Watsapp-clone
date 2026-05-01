@@ -1,17 +1,17 @@
+const dotenv = require('dotenv');
+const path = require('path');
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const dotenv = require('dotenv');
-const path = require('path');
 const connectDB = require('./config/db');
 const userRoutes = require('./routes/userRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const socketHandler = require('./socket/socketHandler');
 const { migrateUsers } = require('./utils/migrate');
-
-dotenv.config({ path: path.resolve(__dirname, '.env') });
 console.log('GROQ_API_KEY configured:', Boolean(process.env.GROQ_API_KEY));
 
 // Connect to DB and run migrations
