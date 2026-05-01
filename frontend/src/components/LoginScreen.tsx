@@ -181,7 +181,7 @@ export default function LoginScreen({ onLogin }: Props) {
   )
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#111b21] relative overflow-hidden">
+    <div className="h-full w-full flex items-center justify-center bg-[#111b21] relative overflow-hidden">
       <div className="absolute top-0 left-0 right-0 h-[222px] bg-[#00a884]" />
 
       <div className="relative z-10 w-full max-w-[460px] mx-4">

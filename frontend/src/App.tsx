@@ -871,7 +871,7 @@ export default function App() {
 
   // Main chat layout
   return (
-    <div className="h-screen w-screen bg-[#111b21] flex overflow-hidden">
+    <div className="h-full w-full bg-[#111b21] flex overflow-hidden">
       {/* Sidebar (mobile: list view, desktop: left panel) */}
       <div className={`h-full w-full md:w-[420px] md:shrink-0 ${selectedUserId ? 'hidden md:block' : 'block'}`}>
         <Sidebar
