@@ -1,6 +1,30 @@
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type ChangeEvent } from 'react'
 import type { User, Message } from '../types'
 import aiBotAvatar from '../assets/ai-bot.png'
+
+const EMOJIS = ['😀','😂','🤣','😍','🙏','👍','🔥','❤️','✨','🎉','🤔','😅','😊','🙌','😎','😢','😡','👍','👎','👏']
+
+function renderAttachment(attachment?: Message['attachment']) {
+  if (!attachment) return null
+  if (attachment.type === 'image') {
+    return <img src={attachment.url} alt="attachment" className="max-w-full rounded-lg mb-1" style={{ maxHeight: '250px', objectFit: 'contain' }} />
+  }
+  if (attachment.type === 'video') {
+    return <video src={attachment.url} controls className="max-w-full rounded-lg mb-1" style={{ maxHeight: '250px' }} />
+  }
+  if (attachment.type === 'audio') {
+    return <audio src={attachment.url} controls className="w-[240px] mb-1" />
+  }
+  return (
+    <a href={attachment.url} download={attachment.name} className="flex items-center gap-2 p-3 bg-black/20 rounded-lg mb-1 text-[#e9edef] hover:bg-black/30 transition-colors">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+      <div className="flex flex-col min-w-0">
+        <span className="truncate text-sm font-medium">{attachment.name || 'Document'}</span>
+        <span className="text-xs text-[#8696a0]">{(attachment.size ? (attachment.size / 1024).toFixed(1) + ' KB' : '')}</span>
+      </div>
+    </a>
+  )
+}
 
 type Props = {
   currentUser: User
@@ -113,6 +137,15 @@ export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, mes
   const [sending] = useState(false)
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null)
+  
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const [recordingDuration, setRecordingDuration] = useState(0)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -196,8 +229,8 @@ export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, mes
     }
   }
 
-  function handleSend(e: FormEvent) {
-    e.preventDefault()
+  function handleSend(e?: React.SyntheticEvent) {
+    if (e) e.preventDefault()
     const content = draft.trim()
     if (!content || !selectedUser) return
     // If editing, call edit handler instead
@@ -213,6 +246,82 @@ export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, mes
     setDraft('')
     onSendMessage(content)
     inputRef.current?.focus()
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = recorder
+      audioChunksRef.current = []
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        stream.getTracks().forEach(t => t.stop())
+        if (audioChunksRef.current.length > 0) {
+          const reader = new FileReader()
+          reader.onloadend = () => {
+            const dataUrl = reader.result as string
+            onSendMessage('', { url: dataUrl, type: 'audio', mimeType: 'audio/webm', size: blob.size })
+          }
+          reader.readAsDataURL(blob)
+        }
+        setRecording(false)
+        setRecordingDuration(0)
+        if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
+      }
+
+      recorder.start()
+      setRecording(true)
+      setRecordingDuration(0)
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(d => d + 1)
+      }, 1000)
+    } catch (err) {
+      console.error('Failed to start recording', err)
+      alert('Could not access microphone.')
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop()
+    }
+  }
+
+  function cancelRecording() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      audioChunksRef.current = []
+      mediaRecorderRef.current.stop()
+    }
+    setRecording(false)
+    setRecordingDuration(0)
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
+  }
+
+  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 15 * 1024 * 1024) {
+      alert('File size limit is 15MB')
+      return
+    }
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string
+      let type: 'image' | 'video' | 'audio' | 'document' = 'document'
+      if (file.type.startsWith('image/')) type = 'image'
+      else if (file.type.startsWith('video/')) type = 'video'
+      else if (file.type.startsWith('audio/')) type = 'audio'
+
+      onSendMessage('', { url: dataUrl, type, name: file.name, size: file.size, mimeType: file.type })
+    }
+    reader.readAsDataURL(file)
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   // Empty state — no chat selected
@@ -357,7 +466,8 @@ export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, mes
                   >
                     <div className="grid grid-cols-[1fr_auto] items-end gap-x-2">
                       <div className="text-sm leading-relaxed whitespace-pre-wrap break-words min-w-0">
-                        {renderBoldEmphasis(m.content)}
+                        {renderAttachment(m.attachment)}
+                        {m.content && renderBoldEmphasis(m.content)}
                       </div>
                       <div
                         className={`flex items-center gap-1 whitespace-nowrap ${
@@ -453,44 +563,76 @@ export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, mes
       )}
 
       {/* Message input */}
-      <div className="bg-[#202c33] px-4 py-2.5 shrink-0">
+      <div className="bg-[#202c33] px-4 py-2.5 shrink-0 relative">
+        {showEmojiPicker && (
+          <div className="absolute bottom-[calc(100%+8px)] left-4 bg-[#202c33] border border-[#2a3942] rounded-lg shadow-xl p-2 w-[280px] grid grid-cols-5 gap-2 z-50">
+            {EMOJIS.map(e => (
+              <button type="button" key={e} onClick={() => { setDraft(d => d + e); setShowEmojiPicker(false); inputRef.current?.focus() }} className="text-2xl hover:bg-[#2a3942] rounded p-1 transition-colors">{e}</button>
+            ))}
+          </div>
+        )}
         <form onSubmit={handleSend} className="flex items-center gap-2">
           {/* Emoji button */}
-          <button type="button" className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center text-[#8696a0] transition-colors shrink-0">
+          <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={`w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center transition-colors shrink-0 ${showEmojiPicker ? 'text-[#00a884]' : 'text-[#8696a0]'}`}>
             <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
               <path d="M9.153 11.603c.795 0 1.439-.879 1.439-1.962s-.644-1.962-1.439-1.962-1.439.879-1.439 1.962.644 1.962 1.439 1.962zm5.694 0c.795 0 1.439-.879 1.439-1.962s-.644-1.962-1.439-1.962-1.439.879-1.439 1.962.644 1.962 1.439 1.962zM12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm-1.108-4.114c-1.263-.282-2.37-1.146-2.956-2.356-.095-.196-.31-.298-.513-.24a.476.476 0 00-.322.465c.052.937.418 1.856 1.048 2.583a5.023 5.023 0 002.286 1.543c.354.117.728.176 1.11.176h.91c.382 0 .755-.059 1.11-.176a5.018 5.018 0 002.286-1.543 4.94 4.94 0 001.047-2.583.476.476 0 00-.322-.465c-.203-.058-.418.044-.513.24-.587 1.21-1.693 2.074-2.956 2.356a4.196 4.196 0 01-1.215 0z"/>
             </svg>
           </button>
 
           {/* Attachment button */}
-          <button type="button" className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center text-[#8696a0] transition-colors shrink-0">
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center text-[#8696a0] transition-colors shrink-0">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
               <path d="M1.816 15.556v.002c0 1.502.584 2.912 1.646 3.972s2.472 1.647 3.974 1.647a5.58 5.58 0 003.972-1.645l9.547-9.548c.769-.768 1.147-1.767 1.058-2.817-.079-.968-.548-1.927-1.319-2.698-1.594-1.592-4.068-1.711-5.517-.262l-7.916 7.915c-.881.881-.792 2.25.214 3.261.959.958 2.423 1.053 3.263.215l5.511-5.512c.28-.28.267-.722.053-.936l-.244-.244c-.191-.191-.567-.349-.957.04l-5.506 5.506c-.18.18-.635.127-.976-.214-.098-.097-.576-.613-.213-.973l7.915-7.917c.818-.817 2.267-.699 3.23.262.5.501.802 1.1.849 1.685.051.573-.156 1.111-.589 1.543l-9.547 9.549a3.97 3.97 0 01-2.829 1.171 3.975 3.975 0 01-2.83-1.171 3.973 3.973 0 01-1.172-2.828c0-1.071.415-2.076 1.172-2.83l7.209-7.211c.157-.157.264-.579.028-.814L11.5 4.36a.606.606 0 00-.86.001l-7.21 7.209c-1.062 1.062-1.646 2.472-1.646 3.973l.032.013z"/>
             </svg>
           </button>
+          <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
 
-          {/* Text input */}
-          <input
-            ref={inputRef}
-            id="message-input"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            disabled={sending}
-            placeholder="Type a message"
-            className="flex-1 bg-[#2a3942] rounded-lg px-4 py-2.5 text-sm text-[#d1d7db] placeholder:text-[#8696a0] outline-none min-w-0"
-          />
+          {/* Text input or Recording UI */}
+          {recording ? (
+            <div className="flex-1 flex items-center gap-3 bg-[#2a3942] rounded-lg px-4 py-2.5 min-w-0">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+              <span className="text-[#e9edef] text-sm shrink-0">
+                {Math.floor(recordingDuration / 60).toString().padStart(2, '0')}:{(recordingDuration % 60).toString().padStart(2, '0')}
+              </span>
+              <div className="flex-1" />
+              <button type="button" onClick={cancelRecording} className="text-[#8696a0] hover:text-red-400 text-sm font-medium transition-colors shrink-0">Cancel</button>
+            </div>
+          ) : (
+            <input
+              ref={inputRef}
+              id="message-input"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              disabled={sending}
+              placeholder="Type a message"
+              className="flex-1 bg-[#2a3942] rounded-lg px-4 py-2.5 text-sm text-[#d1d7db] placeholder:text-[#8696a0] outline-none min-w-0"
+            />
+          )}
 
-          {/* Send button */}
-          <button
-            id="send-button"
-            type="submit"
-            disabled={sending || !draft.trim()}
-            className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center text-[#8696a0] transition-colors shrink-0 disabled:opacity-40"
-          >
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-              <path d="M1.101 21.757L23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"/>
-            </svg>
-          </button>
+          {/* Send button or Mic button */}
+          {draft.trim() || recording ? (
+            <button
+              id="send-button"
+              type="button"
+              onClick={recording ? stopRecording : handleSend}
+              disabled={sending}
+              className="w-10 h-10 rounded-full bg-[#00a884] hover:bg-[#06cf9c] flex items-center justify-center text-white transition-colors shrink-0"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path d="M1.101 21.757L23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"/>
+              </svg>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={startRecording}
+              className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center text-[#8696a0] transition-colors shrink-0"
+            >
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                <path d="M11.999 14.942c2.001 0 3.531-1.53 3.531-3.531V4.35c0-2.001-1.53-3.531-3.531-3.531S8.468 2.349 8.468 4.35v7.061c0 2.001 1.53 3.531 3.531 3.531zm6.238-3.531c0 3.531-2.942 6.002-6.238 6.002s-6.238-2.471-6.238-6.002H3.761c0 4.001 3.178 7.297 7.061 7.885v3.884h2.354v-3.884c3.884-.588 7.061-3.884 7.061-7.885h-2z"/>
+              </svg>
+            </button>
+          )}
         </form>
       </div>
     </div>

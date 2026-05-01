@@ -18,8 +18,15 @@ const MessageSchema = new mongoose.Schema({
   }],
   content: {
     type: String,
-    required: true,
-    trim: true
+    trim: true,
+    default: ''
+  },
+  attachment: {
+    url: String,
+    type: { type: String }, // 'image', 'video', 'audio', 'document'
+    name: String,
+    size: Number,
+    mimeType: String
   },
   timestamp: {
     type: Date,

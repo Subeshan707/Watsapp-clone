@@ -112,14 +112,14 @@ module.exports = (io) => {
     });
 
     socket.on('sendMessage', async (data, callback) => {
-      const { receiverId, content } = data;
-      if (!receiverId || !content || content.trim() === '') {
+      const { receiverId, content, attachment } = data;
+      if (!receiverId || ((!content || content.trim() === '') && !attachment)) {
         if (callback) callback({ error: 'Invalid message data' });
         return;
       }
 
       try {
-        const message = await createAndEmitMessage(io, userId, receiverId, content);
+        const message = await createAndEmitMessage(io, userId, receiverId, content, attachment);
         if (callback) callback({ success: true, message });
 
         // If the receiver is the AI bot, generate a reply asynchronously.

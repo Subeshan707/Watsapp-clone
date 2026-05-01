@@ -587,7 +587,7 @@ export default function App() {
   }
 
   // Send message via Socket.IO with optimistic update (instant UI)
-  async function handleSendMessage(content: string) {
+  async function handleSendMessage(content: string, attachment?: Message['attachment']) {
     if (!currentUser || !selectedUserId) return
     const socket = socketRef.current
     if (!socket?.connected) return
@@ -602,6 +602,7 @@ export default function App() {
       sender: { _id: currentUser._id, username: currentUser.username },
       receiver: { _id: receiverUser._id, username: receiverUser.username },
       content,
+      attachment,
       timestamp: new Date().toISOString(),
       deliveredAt: null,
       readAt: null,
@@ -615,7 +616,7 @@ export default function App() {
     playSentSound()
 
     // Send to server in background (fire and forget, socket echo will reconcile)
-    socket.emit('sendMessage', { receiverId: selectedUserId, content }, (response: { success?: boolean; message?: Message; error?: string }) => {
+    socket.emit('sendMessage', { receiverId: selectedUserId, content, attachment }, (response: { success?: boolean; message?: Message; error?: string }) => {
       if (response?.message) {
         // Replace temp message with real one from server
         setMessagesByUserId((prev) => {

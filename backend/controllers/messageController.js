@@ -11,7 +11,7 @@ function isUserOnline(io, userId) {
 }
 
 // Helper: create and save a message, then emit via socket
-const createAndEmitMessage = async (io, senderId, receiverId, content) => {
+const createAndEmitMessage = async (io, senderId, receiverId, content, attachment = null) => {
   // Validate users exist
   const sender = await User.findById(senderId);
   const receiver = await User.findById(receiverId);
@@ -22,7 +22,8 @@ const createAndEmitMessage = async (io, senderId, receiverId, content) => {
   const message = new Message({
     sender: senderId,
     receiver: receiverId,
-    content: content.trim(),
+    content: content ? content.trim() : '',
+    attachment,
     deliveredAt
   });
   await message.save();
@@ -67,16 +68,16 @@ const getMessages = async (req, res) => {
 
 // Send message via REST API
 const sendMessage = async (req, res) => {
-  const { receiverId, content } = req.body;
+  const { receiverId, content, attachment } = req.body;
   const senderId = req.userId;
 
-  if (!receiverId || !content || content.trim() === '') {
-    return res.status(400).json({ error: 'Receiver ID and non-empty content are required' });
+  if (!receiverId || ((!content || content.trim() === '') && !attachment)) {
+    return res.status(400).json({ error: 'Receiver ID and content or attachment are required' });
   }
 
   try {
     const io = req.app.get('io');
-    const message = await createAndEmitMessage(io, senderId, receiverId, content);
+    const message = await createAndEmitMessage(io, senderId, receiverId, content, attachment);
     res.status(201).json(message);
   } catch (err) {
     res.status(500).json({ error: err.message || 'Failed to send message' });

@@ -15,4 +15,11 @@ export type Message = {
   deliveredAt?: string | null
   readAt?: string | null
   editedAt?: string | null
+  attachment?: {
+    url: string
+    type: 'image' | 'video' | 'audio' | 'document'
+    name?: string
+    size?: number
+    mimeType?: string
+  }
 }
