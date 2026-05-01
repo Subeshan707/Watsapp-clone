@@ -12,7 +12,7 @@ function getModel() {
 function getSystemPrompt() {
   return (
     process.env.AI_SYSTEM_PROMPT ||
-    'You are a helpful AI chat bot inside a WhatsApp-style chat app. Keep replies concise and friendly. Use plain text. For highlighting/emphasis, use Markdown bold with double asterisks like **this** (never triple asterisks like ***this***).'
+    'You are a helpful AI chat bot inside a Orbit-style chat app. Keep replies concise and friendly. Use plain text. For highlighting/emphasis, use Markdown bold with double asterisks like **this** (never triple asterisks like ***this***).'
   );
 }
 

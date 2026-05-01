@@ -185,7 +185,7 @@ export default function AddContactDialog({ open, defaultCountryCode, onAdd, onSy
           </form>
 
           <p className="text-center text-xs text-[#8696a0]">
-            Only contacts registered on WhatsApp will appear in your chat list
+            Only contacts registered on Orbit will appear in your chat list
           </p>
         </div>
       </div>

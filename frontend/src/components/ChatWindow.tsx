@@ -335,7 +335,7 @@ export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, mes
               <path fill="#4A5B64" d="M131.589 68.942a4.584 4.584 0 110-9.168 4.584 4.584 0 010 9.168zM151.5 68.942a4.584 4.584 0 110-9.168 4.584 4.584 0 010 9.168zM171.5 68.942a4.584 4.584 0 110-9.168 4.584 4.584 0 010 9.168z"/>
             </svg>
           </div>
-          <h2 className="text-[32px] font-light text-[#e9edef] mb-3 tracking-tight">WhatsApp Web</h2>
+          <h2 className="text-[32px] font-light text-[#e9edef] mb-3 tracking-tight">Orbit</h2>
           <p className="text-sm text-[#8696a0] leading-relaxed mb-8">
             Send and receive messages in real-time. Select a conversation from the sidebar to get started.
           </p>

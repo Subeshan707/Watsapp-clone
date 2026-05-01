@@ -81,7 +81,7 @@ const sendOtp = async (req, res) => {
 
     try {
       await twilioClient.messages.create({
-        body: `Your WhatsApp verification code is: ${otp}. Do not share this code with anyone.`,
+        body: `Your Orbit verification code is: ${otp}. Do not share this code with anyone.`,
         from: TWILIO_PHONE,
         to: fullNumber
       });
@@ -234,7 +234,7 @@ const setupProfile = async (req, res) => {
         phoneNumber: cleanPhone,
         countryCode: code,
         username: trimmedName,
-        about: about?.trim() || 'Hey there! I am using WhatsApp.',
+        about: about?.trim() || 'Hey there! I am using Orbit.',
         isVerified: true
       });
     }

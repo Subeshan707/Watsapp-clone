@@ -37,7 +37,7 @@ async function migrateUsers() {
       const user = usersWithoutPhone[i];
       user.phoneNumber = `legacy_${user._id}`;
       user.countryCode = '+00';
-      user.about = user.about || 'Hey there! I am using WhatsApp.';
+      user.about = user.about || 'Hey there! I am using Orbit.';
       user.isVerified = true;
       await user.save();
     }

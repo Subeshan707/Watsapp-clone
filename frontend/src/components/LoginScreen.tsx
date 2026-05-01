@@ -197,7 +197,7 @@ export default function LoginScreen({ onLogin }: Props) {
               {step === 'profile' && 'Profile info'}
             </h1>
             <p className="text-sm text-[#8696a0] leading-relaxed">
-              {step === 'phone' && 'WhatsApp will need to verify your phone number.'}
+              {step === 'phone' && 'Orbit will need to verify your phone number.'}
               {step === 'otp' && (
                 <>
                   We've sent an SMS with a code to<br />
@@ -443,7 +443,7 @@ export default function LoginScreen({ onLogin }: Props) {
                       </svg>
                       Setting up…
                     </span>
-                  ) : 'Continue to WhatsApp'}
+                  ) : 'Continue to Orbit'}
                 </button>
               </form>
             </div>

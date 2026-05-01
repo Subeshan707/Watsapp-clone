@@ -19,7 +19,7 @@ const UserSchema = new mongoose.Schema({
   },
   about: {
     type: String,
-    default: 'Hey there! I am using WhatsApp.',
+    default: 'Hey there! I am using Orbit.',
     trim: true
   },
   isVerified: {

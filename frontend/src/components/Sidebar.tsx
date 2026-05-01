@@ -163,7 +163,7 @@ export default function Sidebar({
             </div>
             <p className="text-sm text-[#8696a0] mb-2">
               {users.length === 0
-                ? 'No contacts on WhatsApp yet'
+                ? 'No contacts on Orbit yet'
                 : 'No matching contacts found'}
             </p>
             {users.length === 0 && (
