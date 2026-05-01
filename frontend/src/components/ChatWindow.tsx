@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type ChangeEvent } from 'react'
 import type { User, Message } from '../types'
 import aiBotAvatar from '../assets/ai-bot.png'
-
-const EMOJIS = ['😀','😂','🤣','😍','🙏','👍','🔥','❤️','✨','🎉','🤔','😅','😊','🙌','😎','😢','😡','👍','👎','👏']
+import EmojiPicker from 'emoji-picker-react'
 
 function renderAttachment(attachment?: Message['attachment']) {
   if (!attachment) return null
@@ -565,10 +564,14 @@ export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, mes
       {/* Message input */}
       <div className="bg-[#202c33] px-4 py-2.5 shrink-0 relative">
         {showEmojiPicker && (
-          <div className="absolute bottom-[calc(100%+8px)] left-4 bg-[#202c33] border border-[#2a3942] rounded-lg shadow-xl p-2 w-[280px] grid grid-cols-5 gap-2 z-50">
-            {EMOJIS.map(e => (
-              <button type="button" key={e} onClick={() => { setDraft(d => d + e); setShowEmojiPicker(false); inputRef.current?.focus() }} className="text-2xl hover:bg-[#2a3942] rounded p-1 transition-colors">{e}</button>
-            ))}
+          <div className="absolute bottom-[calc(100%+8px)] left-4 z-50 shadow-xl rounded-lg overflow-hidden">
+            <EmojiPicker
+              onEmojiClick={(emojiData) => {
+                setDraft(d => d + emojiData.emoji)
+                inputRef.current?.focus()
+              }}
+              theme="dark"
+            />
           </div>
         )}
         <form onSubmit={handleSend} className="flex items-center gap-2">
@@ -585,7 +588,7 @@ export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, mes
               <path d="M1.816 15.556v.002c0 1.502.584 2.912 1.646 3.972s2.472 1.647 3.974 1.647a5.58 5.58 0 003.972-1.645l9.547-9.548c.769-.768 1.147-1.767 1.058-2.817-.079-.968-.548-1.927-1.319-2.698-1.594-1.592-4.068-1.711-5.517-.262l-7.916 7.915c-.881.881-.792 2.25.214 3.261.959.958 2.423 1.053 3.263.215l5.511-5.512c.28-.28.267-.722.053-.936l-.244-.244c-.191-.191-.567-.349-.957.04l-5.506 5.506c-.18.18-.635.127-.976-.214-.098-.097-.576-.613-.213-.973l7.915-7.917c.818-.817 2.267-.699 3.23.262.5.501.802 1.1.849 1.685.051.573-.156 1.111-.589 1.543l-9.547 9.549a3.97 3.97 0 01-2.829 1.171 3.975 3.975 0 01-2.83-1.171 3.973 3.973 0 01-1.172-2.828c0-1.071.415-2.076 1.172-2.83l7.209-7.211c.157-.157.264-.579.028-.814L11.5 4.36a.606.606 0 00-.86.001l-7.21 7.209c-1.062 1.062-1.646 2.472-1.646 3.973l.032.013z"/>
             </svg>
           </button>
-          <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+          <input type="file" ref={fileInputRef} onChange={handleFileChange} className="w-0 h-0 absolute opacity-0 -z-10" />
 
           {/* Text input or Recording UI */}
           {recording ? (
