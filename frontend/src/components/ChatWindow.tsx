@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode, type ChangeEvent } from 'react'
 import type { User, Message } from '../types'
 import aiBotAvatar from '../assets/ai-bot.png'
 import EmojiPicker from 'emoji-picker-react'
+import type { Theme } from 'emoji-picker-react'
 
 function renderAttachment(attachment?: Message['attachment']) {
   if (!attachment) return null
@@ -31,7 +32,7 @@ type Props = {
   aiBotUserId: string | null
   messages: Message[]
   messagesLoading: boolean
-  onSendMessage: (content: string) => Promise<void>
+  onSendMessage: (content: string, attachment?: Message['attachment']) => Promise<void>
   onDeleteMessage: (messageId: string, scope: 'everyone' | 'me') => void
   onEditMessage?: (messageId: string, content: string) => void
   onStartCall: (type: 'audio' | 'video') => void
@@ -570,7 +571,7 @@ export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, mes
                 setDraft(d => d + emojiData.emoji)
                 inputRef.current?.focus()
               }}
-              theme="dark"
+              theme={'dark' as Theme}
             />
           </div>
         )}
