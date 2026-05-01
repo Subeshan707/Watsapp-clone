@@ -53,6 +53,10 @@ function pinUserToTop(list: User[], pinnedId: string | null): User[] {
   return [pinned, ...list.slice(0, idx), ...list.slice(idx + 1)]
 }
 
+function isMobileViewport(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+}
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => loadStoredUser())
   const [users, setUsers] = useState<User[]>([])
@@ -487,6 +491,10 @@ export default function App() {
     if (!currentUser) return
     await addContact(currentUser._id, phoneNumber, countryCode, name)
     await refreshUsers(currentUser._id)
+    setShowAddContact(false)
+    if (isMobileViewport()) {
+      setSelectedUserId(null)
+    }
   }
 
   async function handleSyncFromPhone() {
@@ -517,6 +525,10 @@ export default function App() {
 
     await syncContacts(currentUser._id, parsed)
     await refreshUsers(currentUser._id)
+    setShowAddContact(false)
+    if (isMobileViewport()) {
+      setSelectedUserId(null)
+    }
   }
 
   async function openConversation(otherUserId: string) {
