@@ -384,10 +384,10 @@ export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, mes
             type="button"
             id="audio-call"
             onClick={() => onStartCall('audio')}
-            className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center text-[#aebac1] transition-colors"
+            className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center text-[#aebac1] transition-colors cursor-pointer relative z-10"
             title="Audio call"
           >
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <svg className="pointer-events-none" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
               <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.46.57 3.58a1 1 0 01-.25 1.01l-2.2 2.2z" />
             </svg>
           </button>
@@ -395,10 +395,10 @@ export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, mes
             type="button"
             id="video-call"
             onClick={() => onStartCall('video')}
-            className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center text-[#aebac1] transition-colors"
+            className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center text-[#aebac1] transition-colors cursor-pointer relative z-10"
             title="Video call"
           >
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <svg className="pointer-events-none" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
               <path d="M17 10.5V6c0-1.1-.9-2-2-2H3C1.9 4 1 4.9 1 6v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4.5l4 4v-11l-4 4z" />
             </svg>
           </button>
@@ -562,7 +562,7 @@ export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, mes
       )}
 
       {/* Message input */}
-      <div className="bg-[#202c33] px-4 py-2.5 shrink-0 relative">
+      <div className="bg-[#202c33] px-4 py-2.5 shrink-0 relative z-20">
         {showEmojiPicker && (
           <div className="absolute bottom-[calc(100%+8px)] left-4 z-50 shadow-xl rounded-lg overflow-hidden">
             <EmojiPicker
@@ -576,19 +576,19 @@ export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, mes
         )}
         <form onSubmit={handleSend} className="flex items-center gap-2">
           {/* Emoji button */}
-          <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={`w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center transition-colors shrink-0 ${showEmojiPicker ? 'text-[#00a884]' : 'text-[#8696a0]'}`}>
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+          <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={`w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center transition-colors shrink-0 cursor-pointer ${showEmojiPicker ? 'text-[#00a884]' : 'text-[#8696a0]'}`}>
+            <svg className="pointer-events-none" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
               <path d="M9.153 11.603c.795 0 1.439-.879 1.439-1.962s-.644-1.962-1.439-1.962-1.439.879-1.439 1.962.644 1.962 1.439 1.962zm5.694 0c.795 0 1.439-.879 1.439-1.962s-.644-1.962-1.439-1.962-1.439.879-1.439 1.962.644 1.962 1.439 1.962zM12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm-1.108-4.114c-1.263-.282-2.37-1.146-2.956-2.356-.095-.196-.31-.298-.513-.24a.476.476 0 00-.322.465c.052.937.418 1.856 1.048 2.583a5.023 5.023 0 002.286 1.543c.354.117.728.176 1.11.176h.91c.382 0 .755-.059 1.11-.176a5.018 5.018 0 002.286-1.543 4.94 4.94 0 001.047-2.583.476.476 0 00-.322-.465c-.203-.058-.418.044-.513.24-.587 1.21-1.693 2.074-2.956 2.356a4.196 4.196 0 01-1.215 0z"/>
             </svg>
           </button>
 
           {/* Attachment button */}
-          <button type="button" onClick={() => fileInputRef.current?.click()} className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center text-[#8696a0] transition-colors shrink-0">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+          <label className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center text-[#8696a0] transition-colors shrink-0 cursor-pointer m-0">
+            <svg className="pointer-events-none" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
               <path d="M1.816 15.556v.002c0 1.502.584 2.912 1.646 3.972s2.472 1.647 3.974 1.647a5.58 5.58 0 003.972-1.645l9.547-9.548c.769-.768 1.147-1.767 1.058-2.817-.079-.968-.548-1.927-1.319-2.698-1.594-1.592-4.068-1.711-5.517-.262l-7.916 7.915c-.881.881-.792 2.25.214 3.261.959.958 2.423 1.053 3.263.215l5.511-5.512c.28-.28.267-.722.053-.936l-.244-.244c-.191-.191-.567-.349-.957.04l-5.506 5.506c-.18.18-.635.127-.976-.214-.098-.097-.576-.613-.213-.973l7.915-7.917c.818-.817 2.267-.699 3.23.262.5.501.802 1.1.849 1.685.051.573-.156 1.111-.589 1.543l-9.547 9.549a3.97 3.97 0 01-2.829 1.171 3.975 3.975 0 01-2.83-1.171 3.973 3.973 0 01-1.172-2.828c0-1.071.415-2.076 1.172-2.83l7.209-7.211c.157-.157.264-.579.028-.814L11.5 4.36a.606.606 0 00-.86.001l-7.21 7.209c-1.062 1.062-1.646 2.472-1.646 3.973l.032.013z"/>
             </svg>
-          </button>
-          <input type="file" ref={fileInputRef} onChange={handleFileChange} className="w-0 h-0 absolute opacity-0 -z-10" />
+            <input type="file" onChange={handleFileChange} className="hidden" />
+          </label>
 
           {/* Text input or Recording UI */}
           {recording ? (
@@ -619,9 +619,9 @@ export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, mes
               type="button"
               onClick={recording ? stopRecording : handleSend}
               disabled={sending}
-              className="w-10 h-10 rounded-full bg-[#00a884] hover:bg-[#06cf9c] flex items-center justify-center text-white transition-colors shrink-0"
+              className="w-10 h-10 rounded-full bg-[#00a884] hover:bg-[#06cf9c] flex items-center justify-center text-white transition-colors shrink-0 cursor-pointer"
             >
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <svg className="pointer-events-none" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                 <path d="M1.101 21.757L23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"/>
               </svg>
             </button>
@@ -629,9 +629,9 @@ export default function ChatWindow({ currentUser, selectedUser, aiBotUserId, mes
             <button
               type="button"
               onClick={startRecording}
-              className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center text-[#8696a0] transition-colors shrink-0"
+              className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center text-[#8696a0] transition-colors shrink-0 cursor-pointer"
             >
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+              <svg className="pointer-events-none" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
                 <path d="M11.999 14.942c2.001 0 3.531-1.53 3.531-3.531V4.35c0-2.001-1.53-3.531-3.531-3.531S8.468 2.349 8.468 4.35v7.061c0 2.001 1.53 3.531 3.531 3.531zm6.238-3.531c0 3.531-2.942 6.002-6.238 6.002s-6.238-2.471-6.238-6.002H3.761c0 4.001 3.178 7.297 7.061 7.885v3.884h2.354v-3.884c3.884-.588 7.061-3.884 7.061-7.885h-2z"/>
               </svg>
             </button>
