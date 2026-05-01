@@ -4,7 +4,8 @@ import LoginScreen from './components/LoginScreen'
 import Sidebar from './components/Sidebar'
 import ChatWindow from './components/ChatWindow'
 import CallOverlay, { type CallViewState } from './components/CallOverlay'
-import { setupProfile, getAiBot, getMessages, getUsers } from './lib/api'
+import AddContactDialog from './components/AddContactDialog'
+import { setupProfile, getAiBot, getMessages, getUsers, getContacts, addContact, syncContacts, type ContactEntry } from './lib/api'
 import { createSocket } from './lib/socket'
 import { playNotificationSound, playSentSound, playCallEndSound } from './lib/sounds'
 import { ICE_SERVERS } from './config'
@@ -66,6 +67,8 @@ export default function App() {
   const [cameraOff, setCameraOff] = useState(false)
   const [usersLoading, setUsersLoading] = useState(false)
   const [messagesLoading, setMessagesLoading] = useState(false)
+  const [contacts, setContacts] = useState<ContactEntry[]>([])
+  const [showAddContact, setShowAddContact] = useState(false)
   const socketRef = useRef<Socket | null>(null)
   const currentUserRef = useRef<User | null>(currentUser)
   const selectedUserIdRef = useRef<string | null>(selectedUserId)
@@ -457,8 +460,17 @@ export default function App() {
         setAiBotUserId(null)
       }
 
-      const data = await getUsers(userId)
-      const merged = bot ? [bot, ...data.filter((u) => u._id !== bot._id)] : data
+      // Fetch saved contacts (for display names)
+      try {
+        const userContacts = await getContacts(userId, true)
+        setContacts(userContacts)
+      } catch {
+        // ignore
+      }
+
+      // Show ALL registered users (like WhatsApp shows all contacts who have the app)
+      const allUsers = await getUsers(userId)
+      const merged = bot ? [bot, ...allUsers.filter((u) => u._id !== bot._id)] : allUsers
       setUsers(merged)
       setSelectedUserId((cur) => {
         if (!cur) return cur
@@ -469,6 +481,42 @@ export default function App() {
     } finally {
       setUsersLoading(false)
     }
+  }
+
+  async function handleAddContact(phoneNumber: string, countryCode: string, name: string) {
+    if (!currentUser) return
+    await addContact(currentUser._id, phoneNumber, countryCode, name)
+    await refreshUsers(currentUser._id)
+  }
+
+  async function handleSyncFromPhone() {
+    if (!currentUser) return
+    // Use Contact Picker API (Chrome Android)
+    const nav = navigator as any
+    if (!nav.contacts?.select) {
+      throw new Error('Contact Picker API not supported in this browser. Please add contacts manually.')
+    }
+    const props = ['name', 'tel']
+    const opts = { multiple: true }
+    const selected = await nav.contacts.select(props, opts)
+    if (!selected || selected.length === 0) return
+
+    const parsed: { phoneNumber: string; countryCode?: string; name: string }[] = []
+    for (const c of selected) {
+      const name = c.name?.[0] || 'Unknown'
+      const tels = c.tel || []
+      for (const tel of tels) {
+        const cleaned = tel.replace(/[\s\-()]/g, '')
+        if (cleaned.length >= 6) {
+          parsed.push({ phoneNumber: cleaned, name })
+        }
+      }
+    }
+
+    if (parsed.length === 0) throw new Error('No valid phone numbers found in selected contacts')
+
+    await syncContacts(currentUser._id, parsed)
+    await refreshUsers(currentUser._id)
   }
 
   async function openConversation(otherUserId: string) {
@@ -817,6 +865,7 @@ export default function App() {
         <Sidebar
           currentUser={currentUser}
           users={users}
+          contacts={contacts}
           aiBotUserId={aiBotUserId}
           selectedUserId={selectedUserId}
           messagesByUserId={messagesByUserId}
@@ -825,6 +874,7 @@ export default function App() {
           onSelectUser={openConversation}
           onRefresh={() => refreshUsers(currentUser._id)}
           onLogout={handleLogout}
+          onAddContact={() => setShowAddContact(true)}
         />
       </div>
 
@@ -859,6 +909,14 @@ export default function App() {
           onToggleCamera={toggleCamera}
         />
       )}
+
+      <AddContactDialog
+        open={showAddContact}
+        defaultCountryCode={currentUser.countryCode || '+91'}
+        onAdd={handleAddContact}
+        onSyncFromPhone={handleSyncFromPhone}
+        onClose={() => setShowAddContact(false)}
+      />
     </div>
   )
 }

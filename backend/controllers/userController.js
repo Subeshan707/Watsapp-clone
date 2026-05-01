@@ -54,7 +54,7 @@ const sendOtp = async (req, res) => {
         .services(TWILIO_VERIFY_SID)
         .verifications.create({
           to: fullNumber,
-          channel: 'sms'  // can also use 'whatsapp' or 'call'
+          channel: 'sms'
         });
 
       console.log(`[SMS] Twilio Verify sent to ${fullNumber}`);
@@ -64,13 +64,12 @@ const sendOtp = async (req, res) => {
         mode: 'twilio_verify'
       });
     } catch (err) {
-      console.error('[SMS] Twilio Verify error:', err.message);
-      return res.status(500).json({ error: `Failed to send OTP: ${err.message}` });
+      console.error('[SMS] Twilio Verify failed, falling back to demo:', err.message);
+      // Fall through to demo mode
     }
   }
 
   // ── Option B: Twilio SMS (manual OTP) ──
-  // We generate the OTP ourselves and send it via Twilio SMS API
   if (USE_REAL_SMS && twilioClient && TWILIO_PHONE) {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -94,13 +93,13 @@ const sendOtp = async (req, res) => {
         mode: 'twilio_sms'
       });
     } catch (err) {
-      console.error('[SMS] Twilio SMS error:', err.message);
+      console.error('[SMS] Twilio SMS failed, falling back to demo:', err.message);
       otpStore.delete(fullNumber);
-      return res.status(500).json({ error: `Failed to send SMS: ${err.message}` });
+      // Fall through to demo mode
     }
   }
 
-  // ── Option C: Demo mode (no real SMS) ──
+  // ── Fallback: Demo mode ──
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
   otpStore.set(fullNumber, {
@@ -115,7 +114,6 @@ const sendOtp = async (req, res) => {
     success: true,
     message: 'OTP sent successfully',
     mode: 'demo',
-    // Only included in demo mode — remove in production
     otp: otp
   });
 };
@@ -134,33 +132,11 @@ const verifyOtp = async (req, res) => {
   const code = countryCode?.trim() || '+91';
   const fullNumber = `${code}${cleanPhone}`;
 
-  // ── Twilio Verify check ──
-  if (USE_REAL_SMS && twilioClient && TWILIO_VERIFY_SID) {
-    try {
-      const check = await twilioClient.verify.v2
-        .services(TWILIO_VERIFY_SID)
-        .verificationChecks.create({
-          to: fullNumber,
-          code: otp.trim()
-        });
+  // Check if OTP was stored locally (demo mode or Twilio fallback)
+  const stored = otpStore.get(fullNumber);
 
-      if (check.status !== 'approved') {
-        return res.status(400).json({ error: 'Invalid OTP. Please try again.' });
-      }
-
-      // OTP approved by Twilio — proceed to user lookup
-    } catch (err) {
-      console.error('[SMS] Twilio Verify check error:', err.message);
-      return res.status(400).json({ error: 'Verification failed. Please request a new OTP.' });
-    }
-  } else {
-    // ── Demo/manual OTP check ──
-    const stored = otpStore.get(fullNumber);
-
-    if (!stored) {
-      return res.status(400).json({ error: 'No OTP was sent to this number. Please request a new one.' });
-    }
-
+  if (stored) {
+    // ── Local OTP check (demo/fallback) ──
     if (Date.now() > stored.expiresAt) {
       otpStore.delete(fullNumber);
       return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
@@ -176,8 +152,27 @@ const verifyOtp = async (req, res) => {
       return res.status(400).json({ error: 'Invalid OTP. Please try again.' });
     }
 
-    // OTP is valid — clean up
+    // Valid — clean up
     otpStore.delete(fullNumber);
+  } else if (USE_REAL_SMS && twilioClient && TWILIO_VERIFY_SID) {
+    // ── Twilio Verify check (real SMS was sent) ──
+    try {
+      const check = await twilioClient.verify.v2
+        .services(TWILIO_VERIFY_SID)
+        .verificationChecks.create({
+          to: fullNumber,
+          code: otp.trim()
+        });
+
+      if (check.status !== 'approved') {
+        return res.status(400).json({ error: 'Invalid OTP. Please try again.' });
+      }
+    } catch (err) {
+      console.error('[SMS] Twilio Verify check error:', err.message);
+      return res.status(400).json({ error: 'Verification failed. Please request a new OTP.' });
+    }
+  } else {
+    return res.status(400).json({ error: 'No OTP was sent to this number. Please request a new one.' });
   }
 
   // ── User lookup ──

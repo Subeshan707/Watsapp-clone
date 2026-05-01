@@ -110,3 +110,59 @@ export async function getAiBot(currentUserId: string): Promise<User> {
     userId: currentUserId,
   })
 }
+
+// ── Contacts API ──
+
+export type ContactEntry = {
+  _id: string
+  phoneNumber: string
+  countryCode: string
+  name: string
+  isRegistered: boolean
+  registeredUserId: string | null
+}
+
+export async function syncContacts(
+  currentUserId: string,
+  contacts: { phoneNumber: string; countryCode?: string; name: string }[],
+): Promise<{ success: boolean; added: number; updated: number; total: number }> {
+  return requestJson('/api/contacts/sync', {
+    method: 'POST',
+    userId: currentUserId,
+    body: JSON.stringify({ contacts }),
+  })
+}
+
+export async function addContact(
+  currentUserId: string,
+  phoneNumber: string,
+  countryCode: string,
+  name: string,
+): Promise<{ success: boolean; contact: ContactEntry }> {
+  return requestJson('/api/contacts/add', {
+    method: 'POST',
+    userId: currentUserId,
+    body: JSON.stringify({ phoneNumber, countryCode, name }),
+  })
+}
+
+export async function getContacts(
+  currentUserId: string,
+  all?: boolean,
+): Promise<ContactEntry[]> {
+  const query = all ? '?all=true' : ''
+  return requestJson<ContactEntry[]>(`/api/contacts${query}`, {
+    method: 'GET',
+    userId: currentUserId,
+  })
+}
+
+export async function deleteContactApi(
+  currentUserId: string,
+  contactId: string,
+): Promise<{ success: boolean }> {
+  return requestJson(`/api/contacts/${contactId}`, {
+    method: 'DELETE',
+    userId: currentUserId,
+  })
+}

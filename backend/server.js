@@ -35,9 +35,12 @@ app.use(express.json());
 // Make io accessible to controllers
 app.set('io', io);
 
+const contactRoutes = require('./routes/contactRoutes');
+
 // Routes
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/contacts', contactRoutes);
 app.use('/api/ai', aiRoutes);
 
 // Socket.IO

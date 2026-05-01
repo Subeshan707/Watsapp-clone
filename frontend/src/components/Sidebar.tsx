@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import type { User, Message } from '../types'
+import type { ContactEntry } from '../lib/api'
 import aiBotAvatar from '../assets/ai-bot.png'
 
 type Props = {
   currentUser: User
   users: User[]
+  contacts: ContactEntry[]
   aiBotUserId: string | null
   selectedUserId: string | null
   messagesByUserId: Record<string, Message[]>
@@ -13,6 +15,7 @@ type Props = {
   onSelectUser: (userId: string) => void
   onRefresh: () => void
   onLogout: () => void
+  onAddContact: () => void
 }
 
 function getLastMessage(messages: Message[] | undefined): Message | null {
@@ -54,17 +57,32 @@ function getAvatarColor(id: string): string {
 }
 
 export default function Sidebar({
-  currentUser, users, aiBotUserId, selectedUserId, messagesByUserId,
+  currentUser, users, contacts, aiBotUserId, selectedUserId, messagesByUserId,
   unreadByUserId,
-  loading, onSelectUser, onRefresh, onLogout,
+  loading, onSelectUser, onRefresh, onLogout, onAddContact,
 }: Props) {
   const [search, setSearch] = useState('')
 
+  // Build a map of registeredUserId -> contact name
+  const contactNameMap = new Map<string, string>()
+  for (const c of contacts) {
+    if (c.registeredUserId) {
+      contactNameMap.set(c.registeredUserId, c.name)
+    }
+  }
+
+  // Get display name: contact name (if saved) or profile username
+  function getDisplayName(user: User): string {
+    const contactName = contactNameMap.get(user._id)
+    return contactName || user.username
+  }
+
   const filtered = search.trim()
-    ? users.filter((u) =>
-        u.username.toLowerCase().includes(search.toLowerCase()) ||
-        (u.phoneNumber && u.phoneNumber.includes(search))
-      )
+    ? users.filter((u) => {
+        const displayName = getDisplayName(u)
+        return displayName.toLowerCase().includes(search.toLowerCase()) ||
+          (u.phoneNumber && u.phoneNumber.includes(search))
+      })
     : users
 
   return (
@@ -82,13 +100,24 @@ export default function Sidebar({
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          {/* Add Contact button */}
+          <button
+            id="sidebar-add-contact"
+            onClick={onAddContact}
+            className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center text-[#aebac1] transition-colors"
+            title="New contact"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+            </svg>
+          </button>
           <button
             id="sidebar-refresh"
             onClick={onRefresh}
             disabled={loading}
             className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center text-[#aebac1] transition-colors disabled:opacity-50"
-            title="Refresh users"
+            title="Refresh contacts"
           >
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" className={loading ? 'animate-spin' : ''}>
               <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
@@ -126,10 +155,25 @@ export default function Sidebar({
       {/* User list */}
       <div className="flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
-          <div className="px-6 py-8 text-center text-sm text-[#8696a0]">
-            {users.length === 0
-              ? 'No other users yet. Open another browser to create a second user.'
-              : 'No matching users found.'}
+          <div className="px-6 py-8 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#202c33] flex items-center justify-center">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="#8696a0">
+                <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+              </svg>
+            </div>
+            <p className="text-sm text-[#8696a0] mb-2">
+              {users.length === 0
+                ? 'No contacts on WhatsApp yet'
+                : 'No matching contacts found'}
+            </p>
+            {users.length === 0 && (
+              <button
+                onClick={onAddContact}
+                className="text-sm text-[#00a884] hover:text-[#06cf9c] font-medium transition-colors"
+              >
+                + Add your first contact
+              </button>
+            )}
           </div>
         ) : (
           filtered.map((user) => {
@@ -137,6 +181,7 @@ export default function Sidebar({
             const isSelected = user._id === selectedUserId
             const unreadCount = unreadByUserId[user._id] ?? 0
             const isAiBot = Boolean(aiBotUserId && user._id === aiBotUserId)
+            const displayName = getDisplayName(user)
             return (
               <button
                 key={user._id}
@@ -151,13 +196,13 @@ export default function Sidebar({
                   {isAiBot ? (
                     <img src={aiBotAvatar} alt="AI" className="w-full h-full object-cover" />
                   ) : (
-                    getInitial(user.username)
+                    getInitial(displayName)
                   )}
                 </div>
                 <div className="flex-1 min-w-0 text-left">
                   <div className="flex items-center justify-between">
                     <span className="text-[#e9edef] text-base font-normal truncate">
-                      {user.username}
+                      {displayName}
                     </span>
                     {(lastMsg || (unreadCount > 0 && !isSelected)) && (
                       <div className="flex flex-col items-end shrink-0 ml-2">
