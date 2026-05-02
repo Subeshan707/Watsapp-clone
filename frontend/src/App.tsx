@@ -587,13 +587,23 @@ export default function App() {
   }
 
   // Send message via Socket.IO with optimistic update (instant UI)
-  async function handleSendMessage(content: string, attachment?: Message['attachment']) {
+  async function handleSendMessage(content: string, attachment?: Message['attachment'], replyTo?: Message | null) {
     if (!currentUser || !selectedUserId) return
     const socket = socketRef.current
     if (!socket?.connected) return
 
     const receiverUser = users.find((u) => u._id === selectedUserId)
     if (!receiverUser) return
+
+    const replyToSnapshot = replyTo
+      ? {
+          _id: replyTo._id,
+          sender: replyTo.sender,
+          content: replyTo.content,
+          attachment: replyTo.attachment,
+          timestamp: replyTo.timestamp,
+        }
+      : null
 
     // Optimistic: show message instantly with a temp ID
     const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`
@@ -603,6 +613,7 @@ export default function App() {
       receiver: { _id: receiverUser._id, username: receiverUser.username },
       content,
       attachment,
+      replyTo: replyToSnapshot,
       timestamp: new Date().toISOString(),
       deliveredAt: null,
       readAt: null,
@@ -616,7 +627,7 @@ export default function App() {
     playSentSound()
 
     // Send to server in background (fire and forget, socket echo will reconcile)
-    socket.emit('sendMessage', { receiverId: selectedUserId, content, attachment }, (response: { success?: boolean; message?: Message; error?: string }) => {
+    socket.emit('sendMessage', { receiverId: selectedUserId, content, attachment, replyToId: replyTo?._id ?? null }, (response: { success?: boolean; message?: Message; error?: string }) => {
       if (response?.message) {
         // Replace temp message with real one from server
         setMessagesByUserId((prev) => {

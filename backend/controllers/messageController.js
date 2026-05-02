@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Message = require('../models/Message');
 const User = require('../models/User');
 
@@ -11,11 +12,23 @@ function isUserOnline(io, userId) {
 }
 
 // Helper: create and save a message, then emit via socket
-const createAndEmitMessage = async (io, senderId, receiverId, content, attachment = null) => {
+const createAndEmitMessage = async (io, senderId, receiverId, content, attachment = null, replyToId = null) => {
   // Validate users exist
   const sender = await User.findById(senderId);
   const receiver = await User.findById(receiverId);
   if (!sender || !receiver) throw new Error('Invalid sender or receiver');
+
+  let replyTo = null;
+  if (replyToId && mongoose.Types.ObjectId.isValid(replyToId)) {
+    const original = await Message.findById(replyToId).select('sender receiver');
+    if (original) {
+      const senderMatches = String(original.sender) === String(senderId) && String(original.receiver) === String(receiverId);
+      const receiverMatches = String(original.sender) === String(receiverId) && String(original.receiver) === String(senderId);
+      if (senderMatches || receiverMatches) {
+        replyTo = original._id;
+      }
+    }
+  }
 
   const deliveredAt = isUserOnline(io, receiverId) ? new Date() : null;
 
@@ -24,13 +37,22 @@ const createAndEmitMessage = async (io, senderId, receiverId, content, attachmen
     receiver: receiverId,
     content: content ? content.trim() : '',
     attachment,
+    replyTo,
     deliveredAt
   });
   await message.save();
 
   const populatedMessage = await Message.findById(message._id)
     .populate('sender', '_id username phoneNumber countryCode about')
-    .populate('receiver', '_id username phoneNumber countryCode about');
+    .populate('receiver', '_id username phoneNumber countryCode about')
+    .populate({
+      path: 'replyTo',
+      select: 'sender content attachment timestamp',
+      populate: {
+        path: 'sender',
+        select: '_id username phoneNumber countryCode about'
+      }
+    });
 
   // Emit to both users' rooms
   io.to(`user:${senderId}`).emit('receiveMessage', populatedMessage);
@@ -58,6 +80,14 @@ const getMessages = async (req, res) => {
     })
       .populate('sender', '_id username phoneNumber countryCode about')
       .populate('receiver', '_id username phoneNumber countryCode about')
+      .populate({
+        path: 'replyTo',
+        select: 'sender content attachment timestamp',
+        populate: {
+          path: 'sender',
+          select: '_id username phoneNumber countryCode about'
+        }
+      })
       .sort({ timestamp: 1 });
 
     res.json(messages);
@@ -68,7 +98,7 @@ const getMessages = async (req, res) => {
 
 // Send message via REST API
 const sendMessage = async (req, res) => {
-  const { receiverId, content, attachment } = req.body;
+  const { receiverId, content, attachment, replyToId } = req.body;
   const senderId = req.userId;
 
   if (!receiverId || ((!content || content.trim() === '') && !attachment)) {
@@ -77,7 +107,7 @@ const sendMessage = async (req, res) => {
 
   try {
     const io = req.app.get('io');
-    const message = await createAndEmitMessage(io, senderId, receiverId, content, attachment);
+    const message = await createAndEmitMessage(io, senderId, receiverId, content, attachment, replyToId);
     res.status(201).json(message);
   } catch (err) {
     res.status(500).json({ error: err.message || 'Failed to send message' });

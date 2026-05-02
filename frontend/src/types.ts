@@ -6,6 +6,20 @@ export type User = {
   about?: string
 }
 
+export type MessageReply = {
+  _id: string
+  sender: User
+  content: string
+  timestamp?: string
+  attachment?: {
+    url: string
+    type: 'image' | 'video' | 'audio' | 'document'
+    name?: string
+    size?: number
+    mimeType?: string
+  }
+}
+
 export type Message = {
   _id: string
   sender: User
@@ -15,6 +29,7 @@ export type Message = {
   deliveredAt?: string | null
   readAt?: string | null
   editedAt?: string | null
+  replyTo?: MessageReply | null
   attachment?: {
     url: string
     type: 'image' | 'video' | 'audio' | 'document'

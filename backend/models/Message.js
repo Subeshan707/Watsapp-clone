@@ -28,6 +28,11 @@ const MessageSchema = new mongoose.Schema({
     size: Number,
     mimeType: String
   },
+  replyTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message',
+    default: null
+  },
   timestamp: {
     type: Date,
     default: Date.now

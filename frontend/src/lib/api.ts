@@ -96,11 +96,13 @@ export async function sendMessage(
   currentUserId: string,
   receiverId: string,
   content: string,
+  attachment?: Message['attachment'],
+  replyToId?: string | null,
 ): Promise<Message> {
   return requestJson<Message>('/api/messages', {
     method: 'POST',
     userId: currentUserId,
-    body: JSON.stringify({ receiverId, content }),
+    body: JSON.stringify({ receiverId, content, attachment, replyToId }),
   })
 }
 

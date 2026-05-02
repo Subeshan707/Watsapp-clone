@@ -17,7 +17,15 @@ async function markUndeliveredAsDelivered(io, receiverId) {
 
   const updated = await Message.find({ _id: { $in: ids } })
     .populate('sender', '_id username phoneNumber countryCode about')
-    .populate('receiver', '_id username phoneNumber countryCode about');
+    .populate('receiver', '_id username phoneNumber countryCode about')
+    .populate({
+      path: 'replyTo',
+      select: 'sender content attachment timestamp',
+      populate: {
+        path: 'sender',
+        select: '_id username phoneNumber countryCode about'
+      }
+    });
 
   for (const msg of updated) {
     io.to(`user:${msg.sender._id}`).emit('messageUpdated', msg);
@@ -48,7 +56,15 @@ async function markConversationAsRead(io, readerId, otherUserId) {
 
   const updated = await Message.find({ _id: { $in: ids } })
     .populate('sender', '_id username phoneNumber countryCode about')
-    .populate('receiver', '_id username phoneNumber countryCode about');
+    .populate('receiver', '_id username phoneNumber countryCode about')
+    .populate({
+      path: 'replyTo',
+      select: 'sender content attachment timestamp',
+      populate: {
+        path: 'sender',
+        select: '_id username phoneNumber countryCode about'
+      }
+    });
 
   for (const msg of updated) {
     io.to(`user:${msg.sender._id}`).emit('messageUpdated', msg);
@@ -112,14 +128,14 @@ module.exports = (io) => {
     });
 
     socket.on('sendMessage', async (data, callback) => {
-      const { receiverId, content, attachment } = data;
+      const { receiverId, content, attachment, replyToId } = data;
       if (!receiverId || ((!content || content.trim() === '') && !attachment)) {
         if (callback) callback({ error: 'Invalid message data' });
         return;
       }
 
       try {
-        const message = await createAndEmitMessage(io, userId, receiverId, content, attachment);
+        const message = await createAndEmitMessage(io, userId, receiverId, content, attachment, replyToId);
         if (callback) callback({ success: true, message });
 
         // If the receiver is the AI bot, generate a reply asynchronously.
@@ -238,7 +254,15 @@ module.exports = (io) => {
 
         const updated = await Message.findById(messageId)
           .populate('sender', '_id username phoneNumber countryCode about')
-          .populate('receiver', '_id username phoneNumber countryCode about');
+          .populate('receiver', '_id username phoneNumber countryCode about')
+          .populate({
+            path: 'replyTo',
+            select: 'sender content attachment timestamp',
+            populate: {
+              path: 'sender',
+              select: '_id username phoneNumber countryCode about'
+            }
+          });
 
         if (updated) {
           io.to(`user:${String(updated.sender._id)}`).emit('messageUpdated', updated);
