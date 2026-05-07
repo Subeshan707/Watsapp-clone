@@ -1,9 +1,21 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 
+type ContactResult = {
+  success: boolean
+  contact: {
+    _id: string
+    phoneNumber: string
+    countryCode: string
+    name: string
+    isRegistered: boolean
+    registeredUserId: string | null
+  }
+}
+
 type Props = {
   open: boolean
   defaultCountryCode: string
-  onAdd: (phoneNumber: string, countryCode: string, name: string) => Promise<void>
+  onAdd: (phoneNumber: string, countryCode: string, name: string) => Promise<ContactResult>
   onSyncFromPhone: () => Promise<void>
   onClose: () => void
 }
@@ -46,8 +58,12 @@ export default function AddContactDialog({ open, defaultCountryCode, onAdd, onSy
     setSuccess(null)
     setLoading(true)
     try {
-      await onAdd(cleanPhone, countryCode, name.trim())
-      setSuccess(`${name.trim()} added!`)
+      const result = await onAdd(cleanPhone, countryCode, name.trim())
+      if (result?.contact?.isRegistered) {
+        setSuccess(`${name.trim()} added! Chat opened.`)
+      } else {
+        setSuccess(`${name.trim()} saved. They're not on Orbit yet — they'll appear when they sign up.`)
+      }
       setPhone('')
       setName('')
     } catch (err) {

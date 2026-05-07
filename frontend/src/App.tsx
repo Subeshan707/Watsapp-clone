@@ -489,13 +489,18 @@ export default function App() {
   }
 
   async function handleAddContact(phoneNumber: string, countryCode: string, name: string) {
-    if (!currentUser) return
-    await addContact(currentUser._id, phoneNumber, countryCode, name)
+    if (!currentUser) return { success: false, contact: { _id: '', phoneNumber: '', countryCode: '', name: '', isRegistered: false, registeredUserId: null } }
+    const result = await addContact(currentUser._id, phoneNumber, countryCode, name)
     await refreshUsers(currentUser._id)
-    setShowAddContact(false)
-    if (isMobileViewport()) {
+
+    // If the contact is registered, auto-open their conversation
+    if (result?.contact?.registeredUserId) {
+      openConversation(result.contact.registeredUserId)
+    } else if (isMobileViewport()) {
       setSelectedUserId(null)
     }
+
+    return result
   }
 
   async function handleSyncFromPhone() {
