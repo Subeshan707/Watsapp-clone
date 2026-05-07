@@ -18,24 +18,31 @@ const syncContacts = async (req, res) => {
       if (!c.phoneNumber || !c.name) continue;
 
       const rawPhone = c.phoneNumber.trim().replace(/\s+/g, '');
-      const withoutLeadingZeros = rawPhone.replace(/^0+/, '');
       const code = (c.countryCode || '+91').trim();
       const name = c.name.trim();
+      const codeDigits = code.replace(/\D/g, '');
+      const withoutLeadingZeros = rawPhone.replace(/^0+/, '');
 
       if (!withoutLeadingZeros || !name) continue;
 
-      // Find if this contact is a registered user (try with and without leading zeros)
+      // Build phone variants to handle inconsistent storage
+      const variants = new Set([rawPhone, withoutLeadingZeros]);
+      if (codeDigits && !withoutLeadingZeros.startsWith(codeDigits)) {
+        variants.add(codeDigits + withoutLeadingZeros);
+      }
+      if (codeDigits && withoutLeadingZeros.startsWith(codeDigits)) {
+        variants.add(withoutLeadingZeros.slice(codeDigits.length));
+      }
+      const variantArray = [...variants].filter(v => v.length >= 6);
+
       let registeredUser = await User.findOne({
-        phoneNumber: { $in: [rawPhone, withoutLeadingZeros] },
+        phoneNumber: { $in: variantArray },
         countryCode: code
       });
 
-      if (!registeredUser && withoutLeadingZeros.length >= 6) {
+      if (!registeredUser && variantArray.length > 0) {
         registeredUser = await User.findOne({
-          $or: [
-            { phoneNumber: rawPhone },
-            { phoneNumber: withoutLeadingZeros },
-          ]
+          phoneNumber: { $in: variantArray }
         });
       }
 
@@ -80,28 +87,38 @@ const addContact = async (req, res) => {
   }
 
   const rawPhone = phoneNumber.trim().replace(/\s+/g, '');
-  const withoutLeadingZeros = rawPhone.replace(/^0+/, '');
   const code = (countryCode || '+91').trim();
   const trimmedName = name.trim();
 
   try {
-    // Try to find the registered user — check both with and without leading zeros
-    // because setupProfile stores the number as-is (with leading zeros)
-    // while users may enter the number without them (or vice versa).
+    // Build all possible phone number variants to handle inconsistent storage.
+    // Some users registered with country code baked into the phone (e.g. "919486767438")
+    // while others stored just the local number (e.g. "9486767438").
+    const codeDigits = code.replace(/\D/g, ''); // "+91" → "91"
+    const withoutLeadingZeros = rawPhone.replace(/^0+/, '');
+
+    const variants = new Set([rawPhone, withoutLeadingZeros]);
+
+    // Try with country code digits prepended: "9486767438" → "919486767438"
+    if (codeDigits && !withoutLeadingZeros.startsWith(codeDigits)) {
+      variants.add(codeDigits + withoutLeadingZeros);
+    }
+    // Try with country code digits stripped: "919486767438" → "9486767438"
+    if (codeDigits && withoutLeadingZeros.startsWith(codeDigits)) {
+      variants.add(withoutLeadingZeros.slice(codeDigits.length));
+    }
+
+    const variantArray = [...variants].filter(v => v.length >= 6);
+
     let registeredUser = await User.findOne({
-      phoneNumber: { $in: [rawPhone, withoutLeadingZeros] },
+      phoneNumber: { $in: variantArray },
       countryCode: code
     });
 
-    // Also try without country code match for broader matching
-    if (!registeredUser && withoutLeadingZeros.length >= 6) {
+    // Broader search without country code constraint
+    if (!registeredUser && variantArray.length > 0) {
       registeredUser = await User.findOne({
-        $or: [
-          { phoneNumber: rawPhone, countryCode: code },
-          { phoneNumber: withoutLeadingZeros, countryCode: code },
-          { phoneNumber: rawPhone },
-          { phoneNumber: withoutLeadingZeros },
-        ]
+        phoneNumber: { $in: variantArray }
       });
     }
 
@@ -151,18 +168,26 @@ const getContacts = async (req, res) => {
     const results = [];
 
     for (const contact of contacts) {
-      // Re-check registration status (try with and without leading zeros)
+      // Re-check registration status with country-code variants
       if (!contact.isRegistered || !contact.registeredUserId) {
         const rawPhone = contact.phoneNumber;
+        const codeDigits = (contact.countryCode || '').replace(/\D/g, '');
         const withoutLeadingZeros = rawPhone.replace(/^0+/, '');
+
+        const variants = new Set([rawPhone, withoutLeadingZeros]);
+        if (codeDigits && !withoutLeadingZeros.startsWith(codeDigits)) {
+          variants.add(codeDigits + withoutLeadingZeros);
+        }
+        if (codeDigits && withoutLeadingZeros.startsWith(codeDigits)) {
+          variants.add(withoutLeadingZeros.slice(codeDigits.length));
+        }
+        const variantArray = [...variants].filter(v => v.length >= 6);
+
         const registeredUser = await User.findOne({
-          phoneNumber: { $in: [rawPhone, withoutLeadingZeros] },
+          phoneNumber: { $in: variantArray },
           countryCode: contact.countryCode
         }) || await User.findOne({
-          $or: [
-            { phoneNumber: rawPhone },
-            { phoneNumber: withoutLeadingZeros },
-          ]
+          phoneNumber: { $in: variantArray }
         });
 
         if (registeredUser) {
