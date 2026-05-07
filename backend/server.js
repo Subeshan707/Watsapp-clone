@@ -38,12 +38,14 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.set('io', io);
 
 const contactRoutes = require('./routes/contactRoutes');
+const pushRoutes = require('./routes/pushRoutes');
 
 // Routes
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/contacts', contactRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/push', pushRoutes);
 
 // Socket.IO
 socketHandler(io);

@@ -17,17 +17,27 @@ const syncContacts = async (req, res) => {
     for (const c of contacts) {
       if (!c.phoneNumber || !c.name) continue;
 
-      const cleanPhone = c.phoneNumber.trim().replace(/\s+/g, '').replace(/^0+/, '');
+      const rawPhone = c.phoneNumber.trim().replace(/\s+/g, '');
+      const withoutLeadingZeros = rawPhone.replace(/^0+/, '');
       const code = (c.countryCode || '+91').trim();
       const name = c.name.trim();
 
-      if (!cleanPhone || !name) continue;
+      if (!withoutLeadingZeros || !name) continue;
 
-      // Find if this contact is a registered user
-      const registeredUser = await User.findOne({
-        phoneNumber: cleanPhone,
+      // Find if this contact is a registered user (try with and without leading zeros)
+      let registeredUser = await User.findOne({
+        phoneNumber: { $in: [rawPhone, withoutLeadingZeros] },
         countryCode: code
       });
+
+      if (!registeredUser && withoutLeadingZeros.length >= 6) {
+        registeredUser = await User.findOne({
+          $or: [
+            { phoneNumber: rawPhone },
+            { phoneNumber: withoutLeadingZeros },
+          ]
+        });
+      }
 
       const updateData = {
         name,
@@ -36,8 +46,8 @@ const syncContacts = async (req, res) => {
       };
 
       const result = await Contact.findOneAndUpdate(
-        { userId, phoneNumber: cleanPhone, countryCode: code },
-        { $set: updateData, $setOnInsert: { userId, phoneNumber: cleanPhone, countryCode: code } },
+        { userId, phoneNumber: withoutLeadingZeros, countryCode: code },
+        { $set: updateData, $setOnInsert: { userId, phoneNumber: withoutLeadingZeros, countryCode: code } },
         { upsert: true, new: true, rawResult: true }
       );
 
@@ -69,26 +79,42 @@ const addContact = async (req, res) => {
     return res.status(400).json({ error: 'Phone number and name are required' });
   }
 
-  const cleanPhone = phoneNumber.trim().replace(/\s+/g, '').replace(/^0+/, '');
+  const rawPhone = phoneNumber.trim().replace(/\s+/g, '');
+  const withoutLeadingZeros = rawPhone.replace(/^0+/, '');
   const code = (countryCode || '+91').trim();
   const trimmedName = name.trim();
 
   try {
-    // Check if contact is a registered user
-    const registeredUser = await User.findOne({
-      phoneNumber: cleanPhone,
+    // Try to find the registered user — check both with and without leading zeros
+    // because setupProfile stores the number as-is (with leading zeros)
+    // while users may enter the number without them (or vice versa).
+    let registeredUser = await User.findOne({
+      phoneNumber: { $in: [rawPhone, withoutLeadingZeros] },
       countryCode: code
     });
 
+    // Also try without country code match for broader matching
+    if (!registeredUser && withoutLeadingZeros.length >= 6) {
+      registeredUser = await User.findOne({
+        $or: [
+          { phoneNumber: rawPhone, countryCode: code },
+          { phoneNumber: withoutLeadingZeros, countryCode: code },
+          { phoneNumber: rawPhone },
+          { phoneNumber: withoutLeadingZeros },
+        ]
+      });
+    }
+
+    // Store the contact using the normalized (no leading zeros) form
     const contact = await Contact.findOneAndUpdate(
-      { userId, phoneNumber: cleanPhone, countryCode: code },
+      { userId, phoneNumber: withoutLeadingZeros, countryCode: code },
       {
         $set: {
           name: trimmedName,
           isRegistered: !!registeredUser,
           registeredUserId: registeredUser ? registeredUser._id : null
         },
-        $setOnInsert: { userId, phoneNumber: cleanPhone, countryCode: code }
+        $setOnInsert: { userId, phoneNumber: withoutLeadingZeros, countryCode: code }
       },
       { upsert: true, new: true }
     );
@@ -125,11 +151,18 @@ const getContacts = async (req, res) => {
     const results = [];
 
     for (const contact of contacts) {
-      // Re-check registration status
+      // Re-check registration status (try with and without leading zeros)
       if (!contact.isRegistered || !contact.registeredUserId) {
+        const rawPhone = contact.phoneNumber;
+        const withoutLeadingZeros = rawPhone.replace(/^0+/, '');
         const registeredUser = await User.findOne({
-          phoneNumber: contact.phoneNumber,
+          phoneNumber: { $in: [rawPhone, withoutLeadingZeros] },
           countryCode: contact.countryCode
+        }) || await User.findOne({
+          $or: [
+            { phoneNumber: rawPhone },
+            { phoneNumber: withoutLeadingZeros },
+          ]
         });
 
         if (registeredUser) {

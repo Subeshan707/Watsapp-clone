@@ -8,6 +8,7 @@ import AddContactDialog from './components/AddContactDialog'
 import { setupProfile, getAiBot, getMessages, getUsers, getContacts, addContact, syncContacts, type ContactEntry } from './lib/api'
 import { createSocket } from './lib/socket'
 import { playNotificationSound, playSentSound, playCallEndSound } from './lib/sounds'
+import { subscribeToPush } from './lib/pushSubscribe'
 import { ICE_SERVERS } from './config'
 import type { Message, User } from './types'
 
@@ -675,6 +676,10 @@ export default function App() {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission()
     }
+    // Subscribe to Web Push notifications
+    subscribeToPush(currentUser._id).catch(() => {
+      // best effort — push might not be supported
+    })
   }, [currentUser])
 
   // Socket connection

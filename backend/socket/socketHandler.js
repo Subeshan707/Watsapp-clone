@@ -3,6 +3,7 @@ const Message = require('../models/Message');
 const { createAndEmitMessage } = require('../controllers/messageController');
 const { getAiBotUsername } = require('../utils/aiBot');
 const { generateAiReplyForConversation } = require('../utils/aiChat');
+const { sendPushToUser } = require('../utils/pushNotify');
 
 async function markUndeliveredAsDelivered(io, receiverId) {
   const pending = await Message.find({ receiver: receiverId, deliveredAt: null }).select('_id');
@@ -137,6 +138,22 @@ module.exports = (io) => {
       try {
         const message = await createAndEmitMessage(io, userId, receiverId, content, attachment, replyToId);
         if (callback) callback({ success: true, message });
+
+        // Send push notification if receiver is offline
+        if (message && !isUserOnline(io, receiverId)) {
+          const senderName = message.sender?.username || 'Someone';
+          const preview = message.attachment
+            ? (message.attachment.type === 'image' ? '📷 Photo' : message.attachment.type === 'video' ? '🎥 Video' : message.attachment.type === 'audio' ? '🎤 Voice message' : '📎 File')
+            : (message.content || '').slice(0, 100);
+          sendPushToUser(receiverId, {
+            title: senderName,
+            body: preview,
+            icon: '/icons/icon-192.png',
+            badge: '/icons/icon-192.png',
+            tag: `msg-${message._id}`,
+            data: { url: '/', senderId: String(message.sender._id) }
+          }).catch(() => {});
+        }
 
         // If the receiver is the AI bot, generate a reply asynchronously.
         if (message?.receiver?.username && message.receiver.username === getAiBotUsername()) {

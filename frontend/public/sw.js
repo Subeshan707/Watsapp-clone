@@ -78,3 +78,51 @@ self.addEventListener('fetch', (event) => {
 
   // Everything else (API calls, socket, etc.) — just go to network
 });
+
+// ── Push Notifications ────────────────────────────────────────
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = { title: 'Orbit', body: event.data.text() };
+  }
+
+  const title = payload.title || 'Orbit';
+  const options = {
+    body: payload.body || '',
+    icon: payload.icon || '/icons/icon-192.png',
+    badge: payload.badge || '/icons/icon-192.png',
+    tag: payload.tag || 'orbit-message',
+    renotify: true,
+    vibrate: [200, 100, 200],
+    data: payload.data || { url: '/' },
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
+
+// When user taps a notification, focus the app or open it
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const url = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      // If an Orbit tab is already open, focus it
+      for (const client of clients) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Otherwise open a new tab
+      return self.clients.openWindow(url);
+    })
+  );
+});
+
