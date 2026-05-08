@@ -12,6 +12,10 @@ type Props = {
   messagesByUserId: Record<string, Message[]>
   unreadByUserId: Record<string, number>
   loading: boolean
+  notificationState?: 'unknown' | 'ready' | 'missing' | 'denied' | 'unsupported'
+  notificationsLoading?: boolean
+  showEnableNotifications?: boolean
+  onEnableNotifications?: () => void
   onSelectUser: (userId: string) => void
   onRefresh: () => void
   onLogout: () => void
@@ -59,7 +63,8 @@ function getAvatarColor(id: string): string {
 export default function Sidebar({
   currentUser, users, contacts, aiBotUserId, selectedUserId, messagesByUserId,
   unreadByUserId,
-  loading, onSelectUser, onRefresh, onLogout, onAddContact,
+  loading, notificationState = 'unknown', notificationsLoading = false, showEnableNotifications = false,
+  onEnableNotifications, onSelectUser, onRefresh, onLogout, onAddContact,
 }: Props) {
   const [search, setSearch] = useState('')
 
@@ -84,6 +89,13 @@ export default function Sidebar({
           (u.phoneNumber && u.phoneNumber.includes(search))
       })
     : users
+
+  const notificationMessage =
+    notificationState === 'denied'
+      ? 'Notifications are blocked in your browser settings. Enable them and reload.'
+      : notificationState === 'unsupported'
+        ? 'Push notifications are not supported on this device.'
+        : 'Enable notifications to receive messages when the app is closed.'
 
   return (
     <div className="w-full h-full flex flex-col bg-[#111b21] border-0 md:border-r md:border-[#2a3942]">
@@ -135,6 +147,26 @@ export default function Sidebar({
           </button>
         </div>
       </div>
+
+      {showEnableNotifications && notificationState !== 'ready' && (
+        <div className="px-3 py-2 bg-[#111b21] shrink-0">
+          <div className="flex items-center gap-3 bg-[#202c33] border border-[#2a3942] rounded-lg px-3 py-2">
+            <div className="text-xs text-[#d1d7db] flex-1">
+              {notificationMessage}
+            </div>
+            {notificationState === 'missing' && onEnableNotifications && (
+              <button
+                type="button"
+                onClick={onEnableNotifications}
+                disabled={notificationsLoading}
+                className="text-xs text-[#00a884] hover:text-[#06cf9c] font-medium transition-colors disabled:opacity-50"
+              >
+                {notificationsLoading ? 'Enabling...' : 'Enable'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div className="px-3 py-2 bg-[#111b21] shrink-0">

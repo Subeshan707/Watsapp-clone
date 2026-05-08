@@ -18,6 +18,8 @@ type Json = Record<string, unknown>
 
 type CallType = 'audio' | 'video'
 
+type PushState = 'unknown' | 'ready' | 'missing' | 'denied' | 'unsupported'
+
 function isUser(value: unknown): value is User {
   if (!value || typeof value !== 'object') return false
   const maybe = value as Json
@@ -74,6 +76,8 @@ export default function App() {
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [contacts, setContacts] = useState<ContactEntry[]>([])
   const [showAddContact, setShowAddContact] = useState(false)
+  const [pushState, setPushState] = useState<PushState>('unknown')
+  const [pushLoading, setPushLoading] = useState(false)
   const socketRef = useRef<Socket | null>(null)
   const currentUserRef = useRef<User | null>(currentUser)
   const selectedUserIdRef = useRef<string | null>(selectedUserId)
@@ -452,6 +456,38 @@ export default function App() {
     setCameraOff(next)
   }, [cameraOff])
 
+  const checkPushState = useCallback(async () => {
+    if (typeof window === 'undefined') return
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setPushState('unsupported')
+      return
+    }
+
+    if (Notification.permission === 'denied') {
+      setPushState('denied')
+      return
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.ready
+      const sub = await registration.pushManager.getSubscription()
+      setPushState(sub ? 'ready' : 'missing')
+    } catch {
+      setPushState('missing')
+    }
+  }, [])
+
+  const enablePushNotifications = useCallback(async () => {
+    if (!currentUser) return
+    setPushLoading(true)
+    try {
+      await subscribeToPush(currentUser._id)
+      await checkPushState()
+    } finally {
+      setPushLoading(false)
+    }
+  }, [currentUser, checkPushState])
+
   async function refreshUsers(userId: string) {
     setUsersLoading(true)
     try {
@@ -574,10 +610,6 @@ export default function App() {
     setUnreadByUserId({})
     cleanupPeerAndMedia()
     clearCallState()
-    // Request notification permission on login
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
-    }
   }
 
   function handleLogout() {
@@ -590,6 +622,7 @@ export default function App() {
     setSelectedUserId(null)
     setMessagesByUserId({})
     setUnreadByUserId({})
+    setPushState('unknown')
   }
 
   // Send message via Socket.IO with optimistic update (instant UI)
@@ -677,15 +710,15 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return
     refreshUsers(currentUser._id)
-    // Request notification permission
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
+    checkPushState()
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+      // Subscribe silently when permission is already granted
+      subscribeToPush(currentUser._id)
+        .then(() => checkPushState())
+        .catch(() => checkPushState())
     }
-    // Subscribe to Web Push notifications
-    subscribeToPush(currentUser._id).catch(() => {
-      // best effort — push might not be supported
-    })
-  }, [currentUser])
+  }, [currentUser, checkPushState])
 
   // Socket connection
   useEffect(() => {
@@ -892,6 +925,8 @@ export default function App() {
   }
 
   // Main chat layout
+  const showEnableNotifications = pushState !== 'ready' && pushState !== 'unknown'
+
   return (
     <div className="h-full w-full bg-[#111b21] flex overflow-hidden">
       {/* Sidebar (mobile: list view, desktop: left panel) */}
@@ -905,6 +940,10 @@ export default function App() {
           messagesByUserId={messagesByUserId}
           unreadByUserId={unreadByUserId}
           loading={usersLoading}
+          notificationState={pushState}
+          notificationsLoading={pushLoading}
+          showEnableNotifications={showEnableNotifications}
+          onEnableNotifications={enablePushNotifications}
           onSelectUser={openConversation}
           onRefresh={() => refreshUsers(currentUser._id)}
           onLogout={handleLogout}
