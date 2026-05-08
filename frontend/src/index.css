@@ -8,22 +8,22 @@
     width: 100%;
     margin: 0;
     padding: 0;
-    overflow: hidden;
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    right: 0;
   }
   body {
+    overflow: hidden;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     @apply bg-[#111b21] text-[#e9edef] antialiased;
+  }
+  #root {
+    position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
   }
 }
 
 /* ── iOS PWA safe-area support ─────────────────────────────────── */
 @supports (padding-top: env(safe-area-inset-top)) {
-  body {
+  #root {
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
