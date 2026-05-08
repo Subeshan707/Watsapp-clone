@@ -1,6 +1,7 @@
 const express = require('express');
 const authenticate = require('../middleware/auth');
 const PushSubscription = require('../models/PushSubscription');
+const { sendPushToUser } = require('../utils/pushNotify');
 
 const router = express.Router();
 
@@ -54,6 +55,28 @@ router.get('/vapid-key', (_req, res) => {
     return res.status(500).json({ error: 'VAPID key not configured' });
   }
   res.status(200).json({ publicKey: key });
+});
+
+// Send a test notification to the current user
+router.post('/test', async (req, res) => {
+  const userId = req.userId;
+  const { title, body } = req.body || {};
+
+  try {
+    const result = await sendPushToUser(userId, {
+      title: title || 'Orbit Test',
+      body: body || 'This is a test notification.',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      tag: `orbit-test-${Date.now()}`,
+      data: { url: '/' },
+    });
+
+    return res.status(200).json({ success: true, result });
+  } catch (err) {
+    console.error('[Push] Test send error:', err.message);
+    return res.status(500).json({ error: 'Failed to send test notification' });
+  }
 });
 
 module.exports = router;

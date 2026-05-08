@@ -18,11 +18,17 @@ if (VAPID_PUBLIC && VAPID_PRIVATE) {
  * Automatically cleans up expired/invalid subscriptions.
  */
 async function sendPushToUser(userId, payload) {
-  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
+  if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
+    console.warn(`[Push] Skipping send (VAPID missing) for user ${userId}`);
+    return { sent: 0, total: 0, skipped: 'missing_vapid' };
+  }
 
   try {
     const subs = await PushSubscription.find({ userId });
-    if (!subs || subs.length === 0) return;
+    if (!subs || subs.length === 0) {
+      console.warn(`[Push] No subscriptions for user ${userId}`);
+      return { sent: 0, total: 0, skipped: 'no_subscriptions' };
+    }
 
     const body = JSON.stringify(payload);
 
@@ -40,12 +46,27 @@ async function sendPushToUser(userId, payload) {
     );
 
     const sent = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.length - sent;
+
     if (sent > 0) {
-      console.log(`[Push] Sent ${sent} notification(s) to user ${userId}`);
+      console.log(`[Push] Sent ${sent}/${subs.length} notification(s) to user ${userId}`);
     }
+    if (failed > 0) {
+      const errors = results
+        .filter((r) => r.status === 'rejected')
+        .map((r) => r.reason)
+        .filter(Boolean);
+      for (const err of errors) {
+        const status = err?.statusCode ? ` status=${err.statusCode}` : '';
+        console.warn(`[Push] Send failed for user ${userId}${status}: ${err?.message || 'unknown error'}`);
+      }
+    }
+
+    return { sent, total: subs.length, failed };
   } catch (err) {
     // Best effort — don't crash the server
     console.error('[Push] Error sending push:', err.message);
+    return { sent: 0, total: 0, failed: 1, error: err.message };
   }
 }
 
